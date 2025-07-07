@@ -1,171 +1,148 @@
 // NajafFlightsApp/js/docx-export.js
 
-// Import docx components (assumes docx library is loaded globally via CDN)
 const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, Packer, AlignmentType, BorderStyle, HeadingLevel } = docx;
 
+// حقول الرحلة بترتيب العرض
+const FLIGHT_HEADERS_AR = [
+    "FLT.NO",
+    "ON chocks Time",
+    "Open Door Time",
+    "Start Cleaning Time",
+    "Complete Cleaning Time",
+    "Ready Boarding Time",
+    "Start Boarding Time",
+    "Complete Boarding Time",
+    "Close Door Time",
+    "Off chocks Time",
+    "الملاحظات"
+];
+
+const FLIGHT_FIELDS_ORDER = [
+    "fltNo",
+    "onChocksTime",
+    "openDoorTime",
+    "startCleaningTime",
+    "completeCleaningTime",
+    "readyBoardingTime",
+    "startBoardingTime",
+    "completeBoardingTime",
+    "closeDoorTime",
+    "offChocksTime",
+    "notes"
+];
+
 /**
- * Creates a DOCX document for a single flight.
- * @param {Object} flightData - The flight object.
+ * Creates a DOCX document for all flights in a given month, grouped by date.
+ * @param {Array<Object>} flightsArray - An array of flight objects for the month.
+ * @param {string} userName - The name of the logged-in user.
+ * @param {string} monthName - The localized name of the month (e.g., "يوليو").
+ * @param {string} year - The year (e.g., "2025").
  */
-export async function exportSingleFlightToDocx(flightData) {
-    const doc = new Document({
-        sections: [{
-            children: [
-                new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: "تقرير رحلة",
-                            bold: true,
-                            size: 36, // ~18pt
-                            color: "2C3E50", // Dark Blue from CSS
-                        }),
-                    ],
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 200 },
-                }),
-                new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: `المستخدم: ${flightData.userName || 'غير معروف'}`, // استخدام userName من بيانات الرحلة
-                            bold: true,
-                            size: 24, // ~12pt
-                        }),
-                    ],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 100 },
-                }),
-                new Table({
-                    rows: [
-                        new TableRow({
-                            children: [
-                                new TableCell({
-                                    children: [new Paragraph({ text: "التاريخ:", alignment: AlignmentType.RIGHT })],
-                                    width: { size: 2000, type: WidthType.DXA },
-                                    borders: {
-                                        top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                    }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ text: flightData.date || 'N/A', alignment: AlignmentType.RIGHT })],
-                                    borders: {
-                                        top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                        right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                                    }
-                                }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({
-                                    children: [new Paragraph({ text: "رقم الرحلة (FLT.NO):", alignment: AlignmentType.RIGHT })],
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ text: flightData.fltNo || 'N/A', alignment: AlignmentType.RIGHT })],
-                                }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "ON chocks Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.onChocksTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Open Door Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.openDoorTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Start Cleaning Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.startCleaningTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Complete Cleaning Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.completeCleaningTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Ready Boarding Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.readyBoardingTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Start Boarding Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.startBoardingTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Complete Boarding Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.completeBoardingTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Close Door Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.closeDoorTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "Off chocks Time:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.offChocksTime || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: "الملاحظات:", alignment: AlignmentType.RIGHT })] }),
-                                new TableCell({ children: [new Paragraph({ text: flightData.notes || 'N/A', alignment: AlignmentType.RIGHT })] }),
-                            ],
-                        }),
-                    ],
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    borders: {
-                        top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                        bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                        left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                        right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                        insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" }, // Light grey inner borders
-                        insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" },
-                    }
-                }),
-                new Paragraph({
-                    text: "",
-                    spacing: { after: 200 },
-                }),
-                new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: "تولدت بواسطة نظام إدارة الطائرات في مطار النجف الأشرف الدولي.",
-                            size: 20, // ~10pt
-                            color: "777777",
-                        }),
-                    ],
-                    alignment: AlignmentType.CENTER,
-                }),
-            ],
-        }],
+export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthName, year) {
+    const sections = [];
+
+    sections.push({
+        children: [
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: `تقرير الرحلات الشهري لشهر ${monthName} لسنة ${year}`,
+                        bold: true,
+                        size: 36, // ~18pt
+                        color: "2C3E50", // Dark Blue from CSS
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 },
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: `المستخدم: ${userName || 'غير معروف'}`,
+                        bold: true,
+                        size: 24, // ~12pt
+                    }),
+                ],
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 300 },
+            }),
+        ],
     });
 
-    // Generate the DOCX blob
-    const blob = await Packer.toBlob(doc);
+    if (flightsArray.length === 0) {
+        sections.push({
+            children: [
+                new Paragraph({
+                    text: "لا توجد رحلات مسجلة لهذا الشهر.",
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 200 },
+                    run: { color: "777777" }
+                })
+            ]
+        });
+    } else {
+        // Group flights by date
+        const flightsByDate = flightsArray.reduce((acc, flight) => {
+            const date = flight.date; // assuming date is in YYYY-MM-DD format
+            if (!acc[date]) {
+                acc[date] = [];
+            }
+            acc[date].push(flight);
+            return acc;
+        }, {});
 
-    // Create a download link
+        // Sort dates in descending order
+        const sortedDates = Object.keys(flightsByDate).sort((a, b) => new Date(b) - new Date(a));
+
+        sortedDates.forEach(date => {
+            sections.push({
+                children: [
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: `الرحلات بتاريخ: ${date}`,
+                                bold: true,
+                                size: 28, // ~14pt
+                                color: "34495e", // From CSS flight card h4
+                            }),
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 400, after: 150 }, // Spacing before each date table
+                    }),
+                    createFlightTable(flightsByDate[date]),
+                ],
+            });
+        });
+    }
+
+    sections.push({
+        children: [
+            new Paragraph({
+                text: "",
+                spacing: { before: 400 }, // Add some space before the footer text
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: "تولدت بواسطة نظام إدارة الطائرات في مطار النجف الأشرف الدولي.",
+                        size: 20, // ~10pt
+                        color: "777777",
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+            }),
+        ],
+    });
+
+    const doc = new Document({
+        sections: sections,
+    });
+
+    const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `تقرير_رحلة_${flightData.fltNo}_${flightData.date}.docx`;
+    a.download = `تقرير_رحلات_شهر_${monthName}_${year}_${userName}.docx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -173,16 +150,63 @@ export async function exportSingleFlightToDocx(flightData) {
 }
 
 /**
- * Creates a DOCX document for admin statistics or all detailed flights.
- * @param {string} type - 'stats' or 'allFlights'.
- * @param {Object} data - Contains filtered flights, user counts, etc.
- * @param {string} filterMonth - Month in YYYY-MM format.
- * @param {string} filterUserEmail - User email or 'all'.
- *
- * ملاحظة: هذه الدالة لم تعد تستخدم في script.js بناءً على طلبك بإزالة لوحة المسؤول.
- * تم الاحتفاظ بها هنا في حال أردت إعادة استخدامها يدوياً أو في تطورات مستقبلية.
+ * Helper function to create a table for a list of flights.
+ * @param {Array<Object>} flights - Array of flight objects for a specific date.
+ * @returns {Table} DOCX Table object.
  */
+function createFlightTable(flights) {
+    const tableRows = [];
+
+    // Header Row
+    const headerCells = FLIGHT_HEADERS_AR.map(header => 
+        new TableCell({
+            children: [new Paragraph({ text: header, alignment: AlignmentType.CENTER, run: { bold: true } })],
+            borders: {
+                top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+            },
+            shading: { fill: "F2F2F2" } // Light grey background for header
+        })
+    );
+    tableRows.push(new TableRow({ children: headerCells, tableHeader: true }));
+
+    // Data Rows
+    flights.forEach(flight => {
+        const dataCells = FLIGHT_FIELDS_ORDER.map(field => 
+            new TableCell({
+                children: [new Paragraph({ text: flight[field] || '', alignment: AlignmentType.CENTER })], // كل البيانات في الوسط
+                borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                    bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                    left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                }
+            })
+        );
+        tableRows.push(new TableRow({ children: dataCells }));
+    });
+
+    return new Table({
+        rows: tableRows,
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+            top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+            left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+            right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+            insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+        },
+        columnWidths: Array(FLIGHT_HEADERS_AR.length).fill(100 / FLIGHT_HEADERS_AR.length * 9600) // Distribute width evenly
+    });
+}
+
+// تم إزالة exportSingleFlightToDocx لأنها لم تعد تستخدم
+// وتم إبقاء exportAdminDataToDocx مع ملاحظة أنها مهملة في هذا الإصدار
 export async function exportAdminDataToDocx(type, data, filterMonth, filterUserEmail) {
+    // ... (الكود القديم لهذه الدالة بدون تغيير)
     const [year, month] = filterMonth.split('-');
     const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
     const monthName = monthNames[parseInt(month) - 1];
@@ -309,13 +333,16 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
                 ]
             });
         } else {
+            // هذه الدالة ستظل تعرض كل رحلة في جدول منفصل كما كانت تفعل، لأنها دالة "المسؤول" الأصلية.
+            // الوظيفة المطلوبة لتجميع الرحلات حسب التاريخ ستكون في `exportMonthlyFlightsToDocx`
+            // التي تم تحديثها أعلاه.
             flightsToExport.forEach((flight, index) => {
                 sections.push({
                     children: [
                         new Paragraph({
                             children: [
                                 new TextRun({
-                                    text: `--- الرحلة رقم ${index + 1} (${flight.userName || 'غير معروف'}) ---`, // عرض اسم المستخدم هنا أيضًا
+                                    text: `--- الرحلة رقم ${index + 1} (${flight.userName || 'غير معروف'}) ---`,
                                     bold: true,
                                     size: 28,
                                     color: "34495e",
@@ -359,10 +386,8 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
         sections: sections,
     });
 
-    // Generate the DOCX blob
     const blob = await Packer.toBlob(doc);
 
-    // Create a download link
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
