@@ -1,12 +1,12 @@
 // --- Global Constants ---
-import { exportSingleFlightToDocx } from './docx-export.js'; // أضف هذا السطر
+import { exportSingleFlightToDocx } from './docx-export.js';
 
 const ACCESS_CODE = 'alpha2007'; // الكود الجديد لتسجيل الدخول
 const FLIGHTS_STORAGE_KEY = 'najaf_flights_data_v2'; // تم تغيير المفتاح لتجنب تضارب البيانات القديمة
 const LOGGED_IN_USER_KEY = 'najaf_flights_logged_in_user_v2'; // تم تغيير المفتاح
 
 // --- DOM Elements ---
-let loginForm, codeInput, loginMessage;
+let loginForm, codeInput, userNameInput, loginMessage; // إضافة userNameInput
 let logoutBtn, userNameDisplaySpan;
 let welcomeMessage, flightFormsContainer, saveAllFlightsBtn, messageContainer, userPastFlightsTableBody, currentMonthNameSpan;
 
@@ -14,13 +14,14 @@ let welcomeMessage, flightFormsContainer, saveAllFlightsBtn, messageContainer, u
 document.addEventListener('DOMContentLoaded', () => {
     // Shared elements
     logoutBtn = document.getElementById('logoutBtn');
-    userNameDisplaySpan = document.getElementById('userNameDisplay'); // تم تغيير الاسم ليعكس عرض اسم المستخدم لا البريد
+    userNameDisplaySpan = document.getElementById('userNameDisplay');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 
     // Login View (index.html)
     if (document.getElementById('loginView')) {
         loginForm = document.getElementById('loginForm');
-        codeInput = document.getElementById('code'); // حقل الكود الجديد
+        codeInput = document.getElementById('code');
+        userNameInput = document.getElementById('userNameInput'); // جلب حقل الاسم
         loginMessage = document.getElementById('loginMessage');
         if (loginForm) loginForm.addEventListener('submit', handleLogin);
     }
@@ -40,8 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const today = new Date();
         currentMonthNameSpan.textContent = today.toLocaleString('ar-IQ', { month: 'long' });
     }
-
-    // لا يوجد Admin View بعد الآن، لذلك تم حذف جميع الأجزاء المتعلقة بها.
 
     checkAuthState(); // Check who is logged in
 });
@@ -85,7 +84,6 @@ function showMessage(element, message, isError = false) {
     }
 }
 
-// Simple unique ID generator (for local data, not true UUID)
 function generateUniqueId() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
@@ -94,42 +92,44 @@ function generateUniqueId() {
 async function checkAuthState() {
     const user = getLoggedInUser();
     const currentPath = window.location.pathname;
-    // التحقق من المسار للصفحة الرئيسية مع أو بدون / أو index.html
     const isOnLoginPage = currentPath.endsWith('index.html') || currentPath === '/NajafFlightsApp/' || currentPath === '/NajafFlightsApp' || currentPath === '/';
 
-    if (user && user.isLoggedIn) { // فقط نتحقق إذا كان المستخدم مسجلاً
+    if (user && user.isLoggedIn) {
         if (userNameDisplaySpan) userNameDisplaySpan.textContent = `مرحباً بك، ${user.name || 'مستخدم'}!`;
         if (logoutBtn) logoutBtn.style.display = 'inline-block';
 
-        if (isOnLoginPage) { // إذا كان مسجلاً وفي صفحة الدخول، ينتقل إلى صفحة الرحلات
+        if (isOnLoginPage) {
             window.location.href = 'flights.html';
         } else if (currentPath.endsWith('flights.html')) {
-            loadUserFlights(user.id); // نستخدم الـ ID الثابت للمستخدم الوحيد
+            loadUserFlights(user.id);
         } else if (currentPath.endsWith('admin.html')) {
-            // إذا حاول الوصول لصفحة المسؤول (التي لم تعد مستخدمة)، يتم تحويله لصفحة الرحلات
             window.location.href = 'flights.html';
         }
-    } else { // لا يوجد مستخدم مسجل
-        if (!isOnLoginPage) { // إذا لم يكن في صفحة الدخول، يتم تحويله إليها
+    } else {
+        if (!isOnLoginPage) {
             window.location.href = 'index.html';
         }
         if (userNameDisplaySpan) userNameDisplaySpan.textContent = '';
         if (logoutBtn) logoutBtn.style.display = 'none';
-        localStorage.removeItem('userName'); // مسح أي اسم مستخدم مخزن لجلسة سابقة
     }
 }
 
 async function handleLogin(e) {
     e.preventDefault();
     const code = codeInput.value.trim();
+    const userName = userNameInput.value.trim(); // جلب الاسم المدخل
 
-    showMessage(loginMessage, '', false); // مسح الرسائل السابقة
+    showMessage(loginMessage, '', false);
+
+    if (userName === '') {
+        showMessage(loginMessage, 'الرجاء إدخال اسمك الكامل.', true);
+        return;
+    }
 
     if (code === ACCESS_CODE) {
-        // بما أن المستخدم واحد، يمكننا تعيين بيانات ثابتة له
         const user = { 
-            id: 'single_user_id', // معرف ثابت للمستخدم الوحيد
-            name: 'منسق الطائرات', // اسم عرضي
+            id: 'single_user_id',
+            name: userName, // تخزين الاسم المدخل
             isLoggedIn: true 
         };
         setLoggedInUser(user);
@@ -205,7 +205,7 @@ async function saveAllFlights() {
         return;
     }
     const userId = user.id;
-    const userName = user.name; // استخدام الاسم الثابت للمستخدم الوحيد
+    const userName = user.name; // استخدام الاسم المدخل من المستخدم
 
     const forms = flightFormsContainer.querySelectorAll('.flight-card');
     const today = new Date();
@@ -213,7 +213,6 @@ async function saveAllFlights() {
     const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
     
     let allFlights = getStoredFlights();
-    // استخدام userId كالمفتاح الرئيسي بدلاً من userEmail
     if (!allFlights[userId]) allFlights[userId] = {};
     if (!allFlights[userId][currentYear]) allFlights[userId][currentYear] = {};
     if (!allFlights[userId][currentYear][currentMonth]) allFlights[userId][currentYear][currentMonth] = {};
@@ -223,10 +222,10 @@ async function saveAllFlights() {
     for (const form of forms) {
         const inputs = form.querySelectorAll('input');
         const flightData = {
-            id: generateUniqueId(), // Local unique ID for each flight
-            userId: userId, // ربط الرحلة بالـ ID الثابت للمستخدم
-            userName: userName,
-            timestamp: new Date().toISOString(), // ISO string for consistent sorting
+            id: generateUniqueId(),
+            userId: userId,
+            userName: userName, // حفظ اسم المستخدم المدخل مع كل رحلة
+            timestamp: new Date().toISOString(),
         };
         let isFormEmpty = true;
         let isDateMissing = true;
@@ -265,8 +264,7 @@ async function saveAllFlights() {
         
         allFlights[userId][currentYear][currentMonth][flightData.id] = flightData;
         flightsSavedCount++;
-        inputs.forEach(input => input.value = ''); // Clear inputs
-        // Reset date input to today after clearing
+        inputs.forEach(input => input.value = '');
         const dateInput = form.querySelector('input[name="date"]');
         if (dateInput) {
             const today = new Date();
@@ -277,13 +275,13 @@ async function saveAllFlights() {
     if (flightsSavedCount > 0) {
         setStoredFlights(allFlights);
         showMessage(messageContainer, `تم حفظ ${flightsSavedCount} رحلة بنجاح!`, false);
-        loadUserFlights(userId); // نستخدم الـ ID الثابت للمستخدم الوحيد
+        loadUserFlights(userId);
     } else {
         showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة.', true);
     }
 }
 
-function loadUserFlights(userId) { // تتلقى الـ ID الثابت للمستخدم
+function loadUserFlights(userId) {
     if (!userPastFlightsTableBody) return;
     userPastFlightsTableBody.innerHTML = '';
 
@@ -292,12 +290,11 @@ function loadUserFlights(userId) { // تتلقى الـ ID الثابت للمس
     const currentYear = today.getFullYear().toString();
     const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
 
-    // الوصول للرحلات باستخدام userId
     const userFlightsForMonth = allFlights[userId]?.[currentYear]?.[currentMonth] || {};
     
     const flightsArray = Object.values(userFlightsForMonth).sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ); // Sort by latest first
+    );
 
     if (flightsArray.length === 0) {
         const row = userPastFlightsTableBody.insertRow();
@@ -311,7 +308,7 @@ function loadUserFlights(userId) { // تتلقى الـ ID الثابت للمس
 
     flightsArray.forEach(flight => {
         const row = userPastFlightsTableBody.insertRow();
-        row.dataset.flightId = flight.id; // Store local unique ID
+        row.dataset.flightId = flight.id;
         
         row.insertCell(0).textContent = flight.date || '';
         row.insertCell(1).textContent = flight.fltNo || '';
@@ -335,7 +332,6 @@ function loadUserFlights(userId) { // تتلقى الـ ID الثابت للمس
     });
 }
 
-// Export single flight to DOCX
 async function exportFlightToWord(flight) {
     try {
         await exportSingleFlightToDocx(flight);
@@ -345,12 +341,3 @@ async function exportFlightToWord(flight) {
         showMessage(messageContainer, 'حدث خطأ أثناء تصدير الرحلة إلى Word.', true);
     }
 }
-
-// تم حذف جميع وظائف Admin Page Logic والوظائف ذات الصلة لأنها لم تعد مطلوبة.
-// بما في ذلك loadAdminUsers, handleAddNewUser, editUser, deleteUser,
-// updateAdminStatsTitle, loadAdminData, populateUserFilter,
-// displayAdminFlights, displayAdminStats, editFlight, deleteFlight.
-
-// كذلك تم حذف دالة exportAdminDataToWord من script.js لأنها لم تعد تستدعى.
-// لكن ستبقى موجودة في docx-export.js في حال أردت استخدامها في المستقبل بشكل يدوي.
-
