@@ -1,12 +1,13 @@
 // NajafFlightsApp/js/docx-export.js
 
-const { 
-    Document, Paragraph, TextRun, Table, TableRow, TableCell, 
-    WidthType, Packer, AlignmentType, BorderStyle, HeadingLevel, 
-    PageOrientation, SectionType 
+const {
+    Document, Paragraph, TextRun, Table, TableRow, TableCell,
+    WidthType, Packer, AlignmentType, BorderStyle, HeadingLevel,
+    PageOrientation, SectionType
 } = docx;
 
 // حقول الرحلة بترتيب العرض
+// تم إزالة "الملاحظات" من هنا
 const FLIGHT_HEADERS_AR = [
     "FLT.NO",
     "ON chocks Time",
@@ -17,10 +18,10 @@ const FLIGHT_HEADERS_AR = [
     "Start Boarding Time",
     "Complete Boarding Time",
     "Close Door Time",
-    "Off chocks Time",
-    "الملاحظات"
+    "Off chocks Time"
 ];
 
+// تم إزالة "notes" من هنا
 const FLIGHT_FIELDS_ORDER = [
     "fltNo",
     "onChocksTime",
@@ -31,8 +32,7 @@ const FLIGHT_FIELDS_ORDER = [
     "startBoardingTime",
     "completeBoardingTime",
     "closeDoorTime",
-    "offChocksTime",
-    "notes"
+    "offChocksTime"
 ];
 
 /**
@@ -70,12 +70,7 @@ function createStandardHeaderFooter() {
         footers: {
             default: new docx.Footer({
                 children: [
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: "المرفقات:-", bold: true, size: 22 }), // ~11pt
-                        ],
-                        alignment: AlignmentType.RIGHT,
-                    }),
+                    // تم نقل "المرفقات:-" ليتم التعامل معها بشكل ديناميكي في الأقسام
                     new Paragraph({
                         children: [
                             new TextRun({
@@ -102,7 +97,7 @@ function createFlightTable(flights) {
     const tableRows = [];
 
     // Header Row
-    const headerCells = FLIGHT_HEADERS_AR.map(header => 
+    const headerCells = FLIGHT_HEADERS_AR.map(header =>
         new TableCell({
             children: [new Paragraph({ text: header, alignment: AlignmentType.CENTER, run: { bold: true } })],
             borders: {
@@ -118,7 +113,7 @@ function createFlightTable(flights) {
 
     // Data Rows
     flights.forEach(flight => {
-        const dataCells = FLIGHT_FIELDS_ORDER.map(field => 
+        const dataCells = FLIGHT_FIELDS_ORDER.map(field =>
             new TableCell({
                 children: [new Paragraph({ text: flight[field] || '', alignment: AlignmentType.CENTER })], // كل البيانات في الوسط
                 borders: {
@@ -164,8 +159,7 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
                 size: { width: 16838, height: 11906 }, // A4 Landscape (width, height in twips)
                 orientation: PageOrientation.LANDSCAPE,
             },
-            // The type of section: continuous, nextColumn, nextPage, nextOddPage, nextEvenPage
-            type: SectionType.NEXT_PAGE, // Start each section on a new page
+            type: SectionType.NEXT_PAGE,
         },
         headers: headerFooter.headers,
         footers: headerFooter.footers,
@@ -222,16 +216,18 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
         const sortedDates = Object.keys(flightsByDate).sort((a, b) => new Date(b) - new Date(a));
 
         sortedDates.forEach(date => {
+            const flightsForCurrentDate = flightsByDate[date];
+            const notesForCurrentDate = flightsForCurrentDate.filter(f => f.notes && f.notes.trim() !== '');
+
             sections.push({
-                 // New section for each date to potentially allow page breaks
                 properties: {
                     page: {
                         size: { width: 16838, height: 11906 }, // A4 Landscape
                         orientation: PageOrientation.LANDSCAPE,
                     },
-                    type: SectionType.CONTINUOUS, // Continuous with previous section, but allows page break
+                    type: SectionType.CONTINUOUS,
                 },
-                headers: headerFooter.headers, // Apply header/footer to all sections
+                headers: headerFooter.headers,
                 footers: headerFooter.footers,
                 children: [
                     new Paragraph({
@@ -246,9 +242,43 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
                         alignment: AlignmentType.RIGHT,
                         spacing: { before: 400, after: 150 },
                     }),
-                    createFlightTable(flightsByDate[date]),
+                    createFlightTable(flightsForCurrentDate),
                 ],
             });
+
+            // Add notes section for this date if notes exist
+            if (notesForCurrentDate.length > 0) {
+                sections.push({
+                    properties: {
+                        page: {
+                            size: { width: 16838, height: 11906 }, // A4 Landscape
+                            orientation: PageOrientation.LANDSCAPE,
+                        },
+                        type: SectionType.CONTINUOUS,
+                    },
+                    headers: headerFooter.headers,
+                    footers: headerFooter.headers, // Use header to get the top part
+                    children: [
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "الملاحظات:", bold: true, size: 26 }), // "المرفقات:-" will be in the footer
+                            ],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { before: 300, after: 100 },
+                        }),
+                        ...notesForCurrentDate.map(flight =>
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: `رحلة رقم ${flight.fltNo || 'N/A'}: `, bold: true, size: 24 }),
+                                    new TextRun({ text: flight.notes, size: 24 }),
+                                ],
+                                alignment: AlignmentType.RIGHT,
+                                spacing: { after: 100 }
+                            })
+                        )
+                    ]
+                });
+            }
         });
     }
 
@@ -283,7 +313,7 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
                 size: { width: 16838, height: 11906 }, // A4 Landscape
                 orientation: PageOrientation.LANDSCAPE,
             },
-            type: SectionType.NEXT_PAGE, // Start on a new page
+            type: SectionType.NEXT_PAGE,
         },
         headers: headerFooter.headers,
         footers: headerFooter.footers,
@@ -326,8 +356,10 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
             ]
         });
     } else {
+        const notesForSelectedDate = flightsArray.filter(f => f.notes && f.notes.trim() !== '');
+
         sections.push({
-             properties: {
+            properties: {
                 page: {
                     size: { width: 16838, height: 11906 }, // A4 Landscape
                     orientation: PageOrientation.LANDSCAPE,
@@ -340,6 +372,40 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
                 createFlightTable(flightsArray),
             ],
         });
+
+        // Add notes section if notes exist for this day
+        if (notesForSelectedDate.length > 0) {
+            sections.push({
+                properties: {
+                    page: {
+                        size: { width: 16838, height: 11906 }, // A4 Landscape
+                        orientation: PageOrientation.LANDSCAPE,
+                    },
+                    type: SectionType.CONTINUOUS,
+                },
+                headers: headerFooter.headers,
+                footers: headerFooter.footers,
+                children: [
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "الملاحظات:", bold: true, size: 26 }),
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 300, after: 100 },
+                    }),
+                    ...notesForSelectedDate.map(flight =>
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: `رحلة رقم ${flight.fltNo || 'N/A'}: `, bold: true, size: 24 }),
+                                new TextRun({ text: flight.notes, size: 24 }),
+                            ],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 100 }
+                        })
+                    )
+                ]
+            });
+        }
     }
 
     const doc = new Document({
@@ -357,10 +423,7 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
     URL.revokeObjectURL(url);
 }
 
-// **ملاحظة:** تم إبقاء exportAdminDataToDocx بدون تغيير في الترويسة والتذييل،
-// حيث أن هذه التعديلات كانت مخصصة لتقارير المستخدم.
-// إذا أردت تطبيق نفس الترويسة والتذييل على تقارير المسؤول،
-// ستحتاج إلى تطبيق دالة createStandardHeaderFooter() داخلها أيضاً.
+// exportAdminDataToDocx (بدون تغيير)
 export async function exportAdminDataToDocx(type, data, filterMonth, filterUserEmail) {
     const [year, month] = filterMonth.split('-');
     const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -370,7 +433,7 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
     let fileName = "";
 
     // If you want standard header/footer here, uncomment and use it
-    // const headerFooter = createStandardHeaderFooter(); 
+    // const headerFooter = createStandardHeaderFooter();
 
     if (type === 'stats') {
         const { userFlightCounts, totalFlights, allUsersMap } = data;
@@ -555,7 +618,8 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
                                 new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: "Complete Boarding Time:", alignment: AlignmentType.RIGHT })] }), new TableCell({ children: [new Paragraph({ text: flight.completeBoardingTime || 'N/A', alignment: AlignmentType.RIGHT })] })] }),
                                 new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: "Close Door Time:", alignment: AlignmentType.RIGHT })] }), new TableCell({ children: [new Paragraph({ text: flight.closeDoorTime || 'N/A', alignment: AlignmentType.RIGHT })] })] }),
                                 new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: "Off chocks Time:", alignment: AlignmentType.RIGHT })] }), new TableCell({ children: [new Paragraph({ text: flight.offChocksTime || 'N/A', alignment: AlignmentType.RIGHT })] })] }),
-                                new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: "الملاحظات:", alignment: AlignmentType.RIGHT })] }), new TableCell({ children: [new Paragraph({ text: flight.notes || 'N/A', alignment: AlignmentType.RIGHT })] })] }),
+                                // لا نضع الملاحظات هنا في تقرير المسؤول
+                                // new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: "الملاحظات:", alignment: AlignmentType.RIGHT })] }), new TableCell({ children: [new Paragraph({ text: flight.notes || 'N/A', alignment: AlignmentType.RIGHT })] })] }),
                             ],
                             width: { size: 100, type: WidthType.PERCENTAGE },
                             borders: {
