@@ -32,7 +32,17 @@
             <p id="messageContainer" class="success-message"></p> <hr>
 
             <h3>رحلاتك السابقة لهذا الشهر</h3>
-            <button id="exportMonthlyFlightsBtn" class="export-button"><i class="fas fa-file-word"></i> تصدير رحلات هذا الشهر</button>
+            
+            <div class="export-options">
+                <div class="input-group-inline">
+                    <label for="exportDateInput">اختر تاريخ التصدير:</label>
+                    <input type="date" id="exportDateInput">
+                </div>
+                <button id="exportDailyFlightsBtn" class="export-button"><i class="fas fa-file-word"></i> تصدير رحلات اليوم المحدد</button>
+            </div>
+            
+            <button id="exportMonthlyFlightsBtn" class="export-button"><i class="fas fa-file-word"></i> تصدير رحلات هذا الشهر (جميع الأيام)</button>
+
             <div class="table-responsive">
                 <table id="userPastFlightsTable">
                     <thead>
@@ -49,7 +59,7 @@
                             <th>Close Door Time</th>
                             <th>Off chocks Time</th>
                             <th>الملاحظات</th>
-                            </tr>
+                        </tr>
                     </thead>
                     <tbody>
                     </tbody>
