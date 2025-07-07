@@ -1,5 +1,5 @@
 // --- Global Constants ---
-import { exportMonthlyFlightsToDocx } from './docx-export.js'; // تغيير الاستيراد للدالة الجديدة
+import { exportMonthlyFlightsToDocx, exportDailyFlightsToDocx } from './docx-export.js'; // استيراد الدالة الجديدة
 
 const ACCESS_CODE = 'alpha2007';
 const FLIGHTS_STORAGE_KEY = 'najaf_flights_data_v2';
@@ -8,7 +8,8 @@ const LOGGED_IN_USER_KEY = 'najaf_flights_logged_in_user_v2';
 // --- DOM Elements ---
 let loginForm, codeInput, userNameInput, loginMessage;
 let logoutBtn, userNameDisplaySpan;
-let welcomeMessage, flightFormsContainer, saveAllFlightsBtn, messageContainer, userPastFlightsTableBody, currentMonthNameSpan, exportMonthlyFlightsBtn; // إضافة exportMonthlyFlightsBtn
+let welcomeMessage, flightFormsContainer, saveAllFlightsBtn, messageContainer, userPastFlightsTableBody, currentMonthNameSpan;
+let exportMonthlyFlightsBtn, exportDailyFlightsBtn, exportDateInput; // إضافة العناصر الجديدة
 
 // --- Initialization on DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,14 +35,19 @@ document.addEventListener('DOMContentLoaded', () => {
         messageContainer = document.getElementById('messageContainer');
         userPastFlightsTableBody = document.querySelector('#userPastFlightsTable tbody');
         currentMonthNameSpan = document.getElementById('currentMonthName');
-        exportMonthlyFlightsBtn = document.getElementById('exportMonthlyFlightsBtn'); // جلب زر التصدير الجديد
+        
+        exportMonthlyFlightsBtn = document.getElementById('exportMonthlyFlightsBtn');
+        exportDailyFlightsBtn = document.getElementById('exportDailyFlightsBtn'); // جلب زر التصدير اليومي
+        exportDateInput = document.getElementById('exportDateInput'); // جلب حقل التاريخ
         
         if (saveAllFlightsBtn) saveAllFlightsBtn.addEventListener('click', saveAllFlights);
-        if (exportMonthlyFlightsBtn) exportMonthlyFlightsBtn.addEventListener('click', handleExportMonthlyFlights); // معالج حدث جديد
+        if (exportMonthlyFlightsBtn) exportMonthlyFlightsBtn.addEventListener('click', handleExportMonthlyFlights);
+        if (exportDailyFlightsBtn) exportDailyFlightsBtn.addEventListener('click', handleExportDailyFlights); // إضافة معالج الحدث الجديد
         
         generateFlightForms(4);
         const today = new Date();
         currentMonthNameSpan.textContent = today.toLocaleString('ar-IQ', { month: 'long' });
+        exportDateInput.value = today.toISOString().split('T')[0]; // تعيين التاريخ الافتراضي لليوم
     }
 
     checkAuthState();
@@ -307,7 +313,7 @@ function loadUserFlights(userId) {
     if (flightsArray.length === 0) {
         const row = userPastFlightsTableBody.insertRow();
         const cell = row.insertCell(0);
-        cell.colSpan = 12; // تم تغيير colspan
+        cell.colSpan = 12;
         cell.textContent = 'لا توجد رحلات سابقة لهذا الشهر.';
         cell.style.textAlign = 'center';
         cell.style.color = '#777';
@@ -330,11 +336,9 @@ function loadUserFlights(userId) {
         row.insertCell(9).textContent = flight.closeDoorTime || '';
         row.insertCell(10).textContent = flight.offChocksTime || '';
         row.insertCell(11).textContent = flight.notes || '';
-        // لا يوجد عمود للإجراءات بعد الآن
     });
 }
 
-// دالة جديدة لمعالجة تصدير جميع الرحلات المعروضة
 async function handleExportMonthlyFlights() {
     const user = getLoggedInUser();
     if (!user || !user.isLoggedIn) {
@@ -351,14 +355,13 @@ async function handleExportMonthlyFlights() {
 
     const userFlightsForMonth = allFlights[userId]?.[currentYear]?.[currentMonth] || {};
     
-    // تحويل الكائن إلى مصفوفة وفرزها
     const flightsArray = Object.values(userFlightsForMonth).sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
         if (dateA.getTime() !== dateB.getTime()) {
-            return dateB.getTime() - dateA.getTime(); // الأحدث أولاً
+            return dateB.getTime() - dateA.getTime();
         }
-        return (a.fltNo || '').localeCompare(b.fltNo || ''); // ثم حسب رقم الرحلة أبجدياً
+        return (a.fltNo || '').localeCompare(b.fltNo || '');
     });
 
     if (flightsArray.length === 0) {
@@ -375,5 +378,44 @@ async function handleExportMonthlyFlights() {
     }
 }
 
-// تم حذف دالة exportFlightToWord القديمة
-// async function exportFlightToWord(flight) { ... }
+// دالة جديدة لمعالجة تصدير الرحلات ليوم محدد
+async function handleExportDailyFlights() {
+    const user = getLoggedInUser();
+    if (!user || !user.isLoggedIn) {
+        showMessage(messageContainer, "خطأ: معلومات المستخدم غير متوفرة. يرجى تسجيل الدخول.", true);
+        return;
+    }
+
+    const exportDate = exportDateInput.value;
+    if (!exportDate) {
+        showMessage(messageContainer, "الرجاء اختيار تاريخ لتصدير الرحلات.", true);
+        return;
+    }
+
+    const userId = user.id;
+    const userName = user.name;
+    const [year, month, day] = exportDate.split('-'); // 2025-07-08
+
+    const allFlights = getStoredFlights();
+    const userFlightsForDate = allFlights[userId]?.[year]?.[month] || {}; // جلب رحلات الشهر
+
+    const flightsForSelectedDate = Object.values(userFlightsForDate).filter(
+        flight => flight.date === exportDate
+    ).sort((a, b) => {
+        // فرز الرحلات لليوم المحدد حسب الوقت أو رقم الرحلة
+        return (a.fltNo || '').localeCompare(b.fltNo || ''); 
+    });
+
+    if (flightsForSelectedDate.length === 0) {
+        showMessage(messageContainer, `لا توجد رحلات مسجلة بتاريخ ${exportDate} لتصديرها.`, true);
+        return;
+    }
+
+    try {
+        await exportDailyFlightsToDocx(flightsForSelectedDate, userName, exportDate);
+        showMessage(messageContainer, `تم تصدير ${flightsForSelectedDate.length} رحلة بتاريخ ${exportDate} بنجاح!`, false);
+    } catch (error) {
+        console.error("Error exporting daily flights to DOCX:", error);
+        showMessage(messageContainer, 'حدث خطأ أثناء تصدير رحلات اليوم المحدد إلى Word.', true);
+    }
+}
