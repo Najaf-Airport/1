@@ -26,7 +26,7 @@ export async function exportSingleFlightToDocx(flightData) {
                 new Paragraph({
                     children: [
                         new TextRun({
-                            text: `المستخدم: ${flightData.userName || 'غير معروف'}`,
+                            text: `المستخدم: ${flightData.userName || 'غير معروف'}`, // استخدام userName من بيانات الرحلة
                             bold: true,
                             size: 24, // ~12pt
                         }),
@@ -69,7 +69,6 @@ export async function exportSingleFlightToDocx(flightData) {
                                 }),
                             ],
                         }),
-                        // Add more rows for each time field
                         new TableRow({
                             children: [
                                 new TableCell({ children: [new Paragraph({ text: "ON chocks Time:", alignment: AlignmentType.RIGHT })] }),
@@ -239,7 +238,6 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
             const nameB = allUsersMap.get(b) || '';
             return nameA.localeCompare(nameB);
         }).map(userEmail => {
-            // بما أنه لا يوجد نظام مستخدمين متعددين، لا داعي لتصفية المسؤول
             const userName = allUsersMap.get(userEmail) || userEmail;
             const count = userFlightCounts[userEmail];
             return new TableRow({
@@ -248,7 +246,7 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
                     new TableCell({ children: [new Paragraph({ text: count.toString(), alignment: AlignmentType.CENTER })] }),
                 ]
             });
-        }).filter(row => row !== null); // Filter out nulls (admin row)
+        }).filter(row => row !== null);
 
         if (userStatRows.length > 0) {
              sections.push({
@@ -317,10 +315,10 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
                         new Paragraph({
                             children: [
                                 new TextRun({
-                                    text: `--- الرحلة رقم ${index + 1} (${flight.userName || 'غير معروف'}) ---`,
+                                    text: `--- الرحلة رقم ${index + 1} (${flight.userName || 'غير معروف'}) ---`, // عرض اسم المستخدم هنا أيضًا
                                     bold: true,
                                     size: 28,
-                                    color: "34495e", // From CSS flight card h4
+                                    color: "34495e",
                                 }),
                             ],
                             alignment: AlignmentType.RIGHT,
