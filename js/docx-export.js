@@ -1,6 +1,10 @@
 // NajafFlightsApp/js/docx-export.js
 
-const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, Packer, AlignmentType, BorderStyle, HeadingLevel } = docx;
+const { 
+    Document, Paragraph, TextRun, Table, TableRow, TableCell, 
+    WidthType, Packer, AlignmentType, BorderStyle, HeadingLevel, 
+    PageOrientation, SectionType 
+} = docx;
 
 // حقول الرحلة بترتيب العرض
 const FLIGHT_HEADERS_AR = [
@@ -32,6 +36,64 @@ const FLIGHT_FIELDS_ORDER = [
 ];
 
 /**
+ * Helper function to create standard header and footer for DOCX.
+ * @returns {Object} header and footer configuration.
+ */
+function createStandardHeaderFooter() {
+    return {
+        headers: {
+            default: new docx.Header({
+                children: [
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "مطار النجف الأشرف الدولي", bold: true, size: 28 }), // ~14pt
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "قسم عمليات ساحة الطيران", bold: true, size: 24 }), // ~12pt
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "شعبة تنسيق الطائرات", bold: true, size: 22 }), // ~11pt
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { after: 200 }, // Space before main content
+                    }),
+                ],
+            }),
+        },
+        footers: {
+            default: new docx.Footer({
+                children: [
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "المرفقات:-", bold: true, size: 22 }), // ~11pt
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "تولدت بواسطة نظام إدارة الطائرات في مطار النجف الأشرف الدولي.",
+                                size: 20, // ~10pt
+                                color: "777777",
+                            }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { before: 100 }
+                    }),
+                ],
+            }),
+        },
+    };
+}
+
+/**
  * Helper function to create a table for a list of flights.
  * @param {Array<Object>} flights - Array of flight objects.
  * @returns {Table} DOCX Table object.
@@ -49,7 +111,7 @@ function createFlightTable(flights) {
                 left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
                 right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
             },
-            shading: { fill: "F2F2F2" } // Light grey background for header
+            shading: { fill: "DDEBF7" } // Light blue-gray background for header
         })
     );
     tableRows.push(new TableRow({ children: headerCells, tableHeader: true }));
@@ -58,12 +120,12 @@ function createFlightTable(flights) {
     flights.forEach(flight => {
         const dataCells = FLIGHT_FIELDS_ORDER.map(field => 
             new TableCell({
-                children: [new Paragraph({ text: flight[field] || '', alignment: AlignmentType.CENTER })],
+                children: [new Paragraph({ text: flight[field] || '', alignment: AlignmentType.CENTER })], // كل البيانات في الوسط
                 borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                    bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                    left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                    right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                    top: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
+                    bottom: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
+                    left: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
                 }
             })
         );
@@ -78,10 +140,10 @@ function createFlightTable(flights) {
             bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
             left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
             right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-            insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-            insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
+            insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0" },
         },
-        columnWidths: Array(FLIGHT_HEADERS_AR.length).fill(100 / FLIGHT_HEADERS_AR.length * 9600)
+        columnWidths: Array(FLIGHT_HEADERS_AR.length).fill(100 / FLIGHT_HEADERS_AR.length * 9600) // Distribute width evenly
     });
 }
 
@@ -94,8 +156,19 @@ function createFlightTable(flights) {
  */
 export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthName, year) {
     const sections = [];
+    const headerFooter = createStandardHeaderFooter(); // Get standard header/footer
 
     sections.push({
+        properties: {
+            page: {
+                size: { width: 16838, height: 11906 }, // A4 Landscape (width, height in twips)
+                orientation: PageOrientation.LANDSCAPE,
+            },
+            // The type of section: continuous, nextColumn, nextPage, nextOddPage, nextEvenPage
+            type: SectionType.NEXT_PAGE, // Start each section on a new page
+        },
+        headers: headerFooter.headers,
+        footers: headerFooter.footers,
         children: [
             new Paragraph({
                 children: [
@@ -103,7 +176,7 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
                         text: `تقرير الرحلات الشهري لشهر ${monthName} لسنة ${year}`,
                         bold: true,
                         size: 36, // ~18pt
-                        color: "2C3E50", // Dark Blue from CSS
+                        color: "2C3E50",
                     }),
                 ],
                 alignment: AlignmentType.CENTER,
@@ -132,7 +205,7 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
                     spacing: { after: 200 },
                     run: { color: "777777" }
                 })
-            ]
+            ],
         });
     } else {
         // Group flights by date
@@ -150,6 +223,16 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
 
         sortedDates.forEach(date => {
             sections.push({
+                 // New section for each date to potentially allow page breaks
+                properties: {
+                    page: {
+                        size: { width: 16838, height: 11906 }, // A4 Landscape
+                        orientation: PageOrientation.LANDSCAPE,
+                    },
+                    type: SectionType.CONTINUOUS, // Continuous with previous section, but allows page break
+                },
+                headers: headerFooter.headers, // Apply header/footer to all sections
+                footers: headerFooter.footers,
                 children: [
                     new Paragraph({
                         children: [
@@ -157,36 +240,17 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
                                 text: `الرحلات بتاريخ: ${date}`,
                                 bold: true,
                                 size: 28, // ~14pt
-                                color: "34495e", // From CSS flight card h4
+                                color: "34495e",
                             }),
                         ],
                         alignment: AlignmentType.RIGHT,
-                        spacing: { before: 400, after: 150 }, // Spacing before each date table
+                        spacing: { before: 400, after: 150 },
                     }),
                     createFlightTable(flightsByDate[date]),
                 ],
             });
         });
     }
-
-    sections.push({
-        children: [
-            new Paragraph({
-                text: "",
-                spacing: { before: 400 }, // Add some space before the footer text
-            }),
-            new Paragraph({
-                children: [
-                    new TextRun({
-                        text: " مطار النجف الأشرف الدولي.",
-                        size: 20, // ~10pt
-                        color: "777777",
-                    }),
-                ],
-                alignment: AlignmentType.CENTER,
-            }),
-        ],
-    });
 
     const doc = new Document({
         sections: sections,
@@ -211,8 +275,18 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
  */
 export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
     const sections = [];
+    const headerFooter = createStandardHeaderFooter(); // Get standard header/footer
 
     sections.push({
+        properties: {
+            page: {
+                size: { width: 16838, height: 11906 }, // A4 Landscape
+                orientation: PageOrientation.LANDSCAPE,
+            },
+            type: SectionType.NEXT_PAGE, // Start on a new page
+        },
+        headers: headerFooter.headers,
+        footers: headerFooter.footers,
         children: [
             new Paragraph({
                 children: [
@@ -220,7 +294,7 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
                         text: `تقرير الرحلات اليومي بتاريخ ${date}`,
                         bold: true,
                         size: 36, // ~18pt
-                        color: "2C3E50", // Dark Blue from CSS
+                        color: "2C3E50",
                     }),
                 ],
                 alignment: AlignmentType.CENTER,
@@ -253,30 +327,20 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
         });
     } else {
         sections.push({
+             properties: {
+                page: {
+                    size: { width: 16838, height: 11906 }, // A4 Landscape
+                    orientation: PageOrientation.LANDSCAPE,
+                },
+                type: SectionType.CONTINUOUS,
+            },
+            headers: headerFooter.headers,
+            footers: headerFooter.footers,
             children: [
-                createFlightTable(flightsArray), // استخدام الدالة المساعدة لإنشاء الجدول
+                createFlightTable(flightsArray),
             ],
         });
     }
-
-    sections.push({
-        children: [
-            new Paragraph({
-                text: "",
-                spacing: { before: 400 },
-            }),
-            new Paragraph({
-                children: [
-                    new TextRun({
-                        text: " مطار النجف الأشرف الدولي.",
-                        size: 20,
-                        color: "777777",
-                    }),
-                ],
-                alignment: AlignmentType.CENTER,
-            }),
-        ],
-    });
 
     const doc = new Document({
         sections: sections,
@@ -293,11 +357,11 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
     URL.revokeObjectURL(url);
 }
 
-
-// **ملاحظة:** تم إبقاء exportAdminDataToDocx مع ملاحظة أنها مهملة في هذا الإصدار
-// وذلك في حال أردت إعادة استخدامها يدوياً أو في تطورات مستقبلية.
+// **ملاحظة:** تم إبقاء exportAdminDataToDocx بدون تغيير في الترويسة والتذييل،
+// حيث أن هذه التعديلات كانت مخصصة لتقارير المستخدم.
+// إذا أردت تطبيق نفس الترويسة والتذييل على تقارير المسؤول،
+// ستحتاج إلى تطبيق دالة createStandardHeaderFooter() داخلها أيضاً.
 export async function exportAdminDataToDocx(type, data, filterMonth, filterUserEmail) {
-    // ... (الكود القديم لهذه الدالة بدون تغيير)
     const [year, month] = filterMonth.split('-');
     const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
     const monthName = monthNames[parseInt(month) - 1];
@@ -305,11 +369,23 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
     let sections = [];
     let fileName = "";
 
+    // If you want standard header/footer here, uncomment and use it
+    // const headerFooter = createStandardHeaderFooter(); 
+
     if (type === 'stats') {
         const { userFlightCounts, totalFlights, allUsersMap } = data;
         fileName = `إحصائيات_رحلات_${monthName}_${year}.docx`;
 
         sections.push({
+            properties: {
+                page: {
+                    size: { width: 16838, height: 11906 }, // A4 Landscape
+                    orientation: PageOrientation.LANDSCAPE,
+                },
+                type: SectionType.NEXT_PAGE,
+            },
+            // headers: headerFooter.headers, // Uncomment if needed
+            // footers: headerFooter.footers, // Uncomment if needed
             children: [
                 new Paragraph({
                     children: [
@@ -365,6 +441,15 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
 
         if (userStatRows.length > 0) {
              sections.push({
+                properties: {
+                    page: {
+                        size: { width: 16838, height: 11906 }, // A4 Landscape
+                        orientation: PageOrientation.LANDSCAPE,
+                    },
+                    type: SectionType.CONTINUOUS,
+                },
+                // headers: headerFooter.headers, // Uncomment if needed
+                // footers: headerFooter.footers, // Uncomment if needed
                 children: [
                     new Table({
                         rows: [
@@ -396,6 +481,15 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
         fileName = `رحلات_تفصيلية_${userDisplayName}_${monthName}_${year}.docx`;
 
         sections.push({
+            properties: {
+                page: {
+                    size: { width: 16838, height: 11906 }, // A4 Landscape
+                    orientation: PageOrientation.LANDSCAPE,
+                },
+                type: SectionType.NEXT_PAGE,
+            },
+            // headers: headerFooter.headers, // Uncomment if needed
+            // footers: headerFooter.footers, // Uncomment if needed
             children: [
                 new Paragraph({
                     children: [
@@ -426,6 +520,15 @@ export async function exportAdminDataToDocx(type, data, filterMonth, filterUserE
         } else {
             flightsToExport.forEach((flight, index) => {
                 sections.push({
+                    properties: {
+                        page: {
+                            size: { width: 16838, height: 11906 }, // A4 Landscape
+                            orientation: PageOrientation.LANDSCAPE,
+                        },
+                        type: SectionType.CONTINUOUS,
+                    },
+                    // headers: headerFooter.headers, // Uncomment if needed
+                    // footers: headerFooter.footers, // Uncomment if needed
                     children: [
                         new Paragraph({
                             children: [
