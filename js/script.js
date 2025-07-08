@@ -303,7 +303,7 @@ async function saveAllFlights() {
     if (!allFlights[userId][currentYear][currentMonth]) allFlights[userId][currentYear][currentMonth] = {};
 
     let flightsSavedCount = 0;
-    let hasError = false; // لتتبع ما إذا كان هناك أي أخطاء في أي نموذج
+    let hasAnyFormError = false; // لتتبع ما إذا كان هناك أي أخطاء في أي نموذج
 
     for (const form of forms) {
         const inputs = form.querySelectorAll('input');
@@ -313,44 +313,39 @@ async function saveAllFlights() {
             userName: userName,
             timestamp: new Date().toISOString(),
         };
-        let isFormCompletelyEmpty = true; // Flag to check if all inputs in this form are empty
-        let isDateMissing = true;
-        let isFltNoMissing = true;
+        let isFormCompletelyEmpty = true; // Flag to check if all inputs in this form are empty (including required ones)
+        let hasAnyInput = false; // Flag to check if any input has a value (even non-required)
+
+        let dateValue = '';
+        let fltNoValue = '';
 
         inputs.forEach(input => {
             const fieldId = input.name;
             const value = input.value.trim();
             
-            if (fieldId === 'date' && value) {
-                flightData[fieldId] = value;
-                isDateMissing = false;
-                isFormCompletelyEmpty = false; // Form is not completely empty if date is filled
-            } else if (fieldId === 'fltNo' && value) {
-                flightData[fieldId] = value;
-                isFltNoMissing = false;
-                isFormCompletelyEmpty = false; // Form is not completely empty if FLT.NO is filled
-            } else if (value) {
-                flightData[fieldId] = value;
-                isFormCompletelyEmpty = false; // Form is not completely empty if any other field is filled
-            } else {
-                flightData[fieldId] = '';
+            if (value) {
+                hasAnyInput = true; // يوجد مدخل واحد على الأقل
+                isFormCompletelyEmpty = false; // النموذج ليس فارغاً تماماً
             }
+
+            if (fieldId === 'date') {
+                dateValue = value;
+            } else if (fieldId === 'fltNo') {
+                fltNoValue = value;
+            }
+            flightData[fieldId] = value; // دائماً قم بتخزين القيمة في flightData
         });
 
-        // إذا كان النموذج فارغاً تماماً، تخطاه ولا تحاول حفظه أو إظهار خطأ
-        if (isFormCompletelyEmpty) {
+        // إذا كان النموذج فارغاً تماماً (لا يوجد أي مدخلات على الإطلاق)، تخطاه دون رسالة خطأ
+        if (!hasAnyInput) {
             continue;
         }
 
-        // تحقق من الحقول الإجبارية فقط إذا لم يكن النموذج فارغاً تماماً
-        if (isDateMissing) {
-            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل التاريخ إجباري.`, true);
-            hasError = true; // سجل وجود خطأ
-            continue; // لا تحفظ هذا النموذج وانتقل للي بعده
-        }
-        if (isFltNoMissing) {
-            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل FLT.NO إجباري.`, true);
-            hasError = true; // سجل وجود خطأ
+        // إذا وصل الكود إلى هنا، فهذا يعني أن النموذج ليس فارغاً تماماً (يحتوي على مدخل واحد على الأقل)
+        // الآن نتحقق من الحقول الإجبارية
+        if (!dateValue || !fltNoValue) {
+            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل التاريخ و/أو FLT.NO إجباريان للحفظ.`, true);
+            hasAnyFormError = true; // سجل وجود خطأ
             continue; // لا تحفظ هذا النموذج وانتقل للي بعده
         }
         
@@ -360,8 +355,14 @@ async function saveAllFlights() {
         // *** لا تمسح الحقول هنا بعد الآن، سيتم مسحها بعد الحفظ الكلي الناجح ***
     }
 
+    // إخفاء أي رسائل خطأ سابقة قبل عرض رسالة جديدة
+    hideMessage(messageContainer);
+
     // إذا كان هناك أي أخطاء في أي نموذج، لا تمسح المسودة ولا تعرض رسالة نجاح عامة
-    if (hasError) {
+    if (hasAnyFormError) {
+        // الرسائل الفردية للأخطاء ستكون قد ظهرت بالفعل
+        // يمكن إضافة رسالة عامة هنا إذا أردت، ولكن الرسائل الفردية أكثر فائدة
+        // showMessage(messageContainer, 'تم حفظ بعض الرحلات بنجاح، لكن كانت هناك أخطاء في رحلات أخرى.', true);
         return; 
     }
 
@@ -372,7 +373,7 @@ async function saveAllFlights() {
         showMessage(messageContainer, `تم حفظ ${flightsSavedCount} رحلة بنجاح!`, false);
     } else {
         // إذا لم يتم حفظ أي رحلات (لأنها كلها كانت فارغة أو بها أخطاء)
-        showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة.', true);
+        showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة (التاريخ و FLT.NO على الأقل).', true);
     }
 }
 
