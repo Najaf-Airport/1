@@ -1,421 +1,676 @@
-// --- Global Constants ---
-import { exportMonthlyFlightsToDocx, exportDailyFlightsToDocx } from './docx-export.js'; // استيراد الدالة الجديدة
+// NajafFlightsApp/js/script.js
 
-const ACCESS_CODE = 'alpha2007';
-const FLIGHTS_STORAGE_KEY = 'najaf_flights_data_v2';
-const LOGGED_IN_USER_KEY = 'najaf_flights_logged_in_user_v2';
-
-// --- DOM Elements ---
-let loginForm, codeInput, userNameInput, loginMessage;
-let logoutBtn, userNameDisplaySpan;
-let welcomeMessage, flightFormsContainer, saveAllFlightsBtn, messageContainer, userPastFlightsTableBody, currentMonthNameSpan;
-let exportMonthlyFlightsBtn, exportDailyFlightsBtn, exportDateInput; // إضافة العناصر الجديدة
-
-// --- Initialization on DOMContentLoaded ---
-document.addEventListener('DOMContentLoaded', () => {
-    // Shared elements
-    logoutBtn = document.getElementById('logoutBtn');
-    userNameDisplaySpan = document.getElementById('userNameDisplay');
-    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
-
-    // Login View (index.html)
-    if (document.getElementById('loginView')) {
-        loginForm = document.getElementById('loginForm');
-        codeInput = document.getElementById('code');
-        userNameInput = document.getElementById('userNameInput');
-        loginMessage = document.getElementById('loginMessage');
-        if (loginForm) loginForm.addEventListener('submit', handleLogin);
-    }
-
-    // Flights View (flights.html)
-    if (document.getElementById('flightsView')) {
-        welcomeMessage = document.getElementById('welcomeMessage');
-        flightFormsContainer = document.getElementById('flightFormsContainer');
-        saveAllFlightsBtn = document.getElementById('saveAllFlightsBtn');
-        messageContainer = document.getElementById('messageContainer');
-        userPastFlightsTableBody = document.querySelector('#userPastFlightsTable tbody');
-        currentMonthNameSpan = document.getElementById('currentMonthName');
-        
-        exportMonthlyFlightsBtn = document.getElementById('exportMonthlyFlightsBtn');
-        exportDailyFlightsBtn = document.getElementById('exportDailyFlightsBtn'); // جلب زر التصدير اليومي
-        exportDateInput = document.getElementById('exportDateInput'); // جلب حقل التاريخ
-        
-        if (saveAllFlightsBtn) saveAllFlightsBtn.addEventListener('click', saveAllFlights);
-        if (exportMonthlyFlightsBtn) exportMonthlyFlightsBtn.addEventListener('click', handleExportMonthlyFlights);
-        if (exportDailyFlightsBtn) exportDailyFlightsBtn.addEventListener('click', handleExportDailyFlights); // إضافة معالج الحدث الجديد
-        
-        generateFlightForms(4);
-        const today = new Date();
-        currentMonthNameSpan.textContent = today.toLocaleString('ar-IQ', { month: 'long' });
-        exportDateInput.value = today.toISOString().split('T')[0]; // تعيين التاريخ الافتراضي لليوم
-    }
-
-    checkAuthState();
-});
-
-// --- Utility Functions ---
-function getStoredFlights() {
+// Function to safely parse JSON from localStorage
+function getStoredItem(key) {
     try {
-        return JSON.parse(localStorage.getItem(FLIGHTS_STORAGE_KEY)) || {};
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
     } catch (e) {
-        console.error("Error parsing flights from localStorage:", e);
-        return {};
-    }
-}
-
-function setStoredFlights(flights) {
-    localStorage.setItem(FLIGHTS_STORAGE_KEY, JSON.stringify(flights));
-}
-
-function getLoggedInUser() {
-    try {
-        return JSON.parse(localStorage.getItem(LOGGED_IN_USER_KEY));
-    } catch (e) {
-        console.error("Error parsing logged in user from localStorage:", e);
+        console.error(`Error parsing localStorage item ${key}:`, e);
         return null;
     }
 }
 
-function setLoggedInUser(user) {
-    localStorage.setItem(LOGGED_IN_USER_KEY, JSON.stringify(user));
-}
-
-function clearLoggedInUser() {
-    localStorage.removeItem(LOGGED_IN_USER_KEY);
-}
-
-function showMessage(element, message, isError = false) {
-    if (element) {
-        element.textContent = message;
-        element.className = isError ? 'error-message' : 'success-message';
-        setTimeout(() => { element.textContent = ''; element.className = ''; }, 5000);
+// Function to safely set JSON to localStorage
+function setStoredItem(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        console.error(`Error setting localStorage item ${key}:`, e);
     }
 }
 
-function generateUniqueId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+// Function to safely remove item from localStorage
+function removeStoredItem(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.error(`Error removing localStorage item ${key}:`, e);
+    }
 }
 
-// --- Authentication Logic ---
-async function checkAuthState() {
-    const user = getLoggedInUser();
-    const currentPath = window.location.pathname;
-    const isOnLoginPage = currentPath.endsWith('index.html') || currentPath === '/NajafFlightsApp/' || currentPath === '/NajafFlightsApp' || currentPath === '/';
+// Global variable to store current user and flight data
+let currentUser = getStoredItem('currentUser'); // Load from localStorage
+let flights = getStoredItem('flights') || []; // Load from localStorage
+let users = getStoredItem('users') || {}; // Load from localStorage
 
-    if (user && user.isLoggedIn) {
-        if (userNameDisplaySpan) userNameDisplaySpan.textContent = `مرحباً بك، ${user.name || 'مستخدم'}!`;
-        if (logoutBtn) logoutBtn.style.display = 'inline-block';
+// UI Elements (assuming these are already defined in your flights.html)
+const loginView = document.getElementById('loginView');
+const mainAppView = document.getElementById('mainAppView');
+const loginForm = document.getElementById('loginForm');
+const flightForm = document.getElementById('flightForm');
+const adminForm = document.getElementById('adminForm'); // May not be used directly if admin section is part of mainAppView
+const flightsTableBody = document.getElementById('flightsTableBody');
+const adminFlightsTableBody = document.getElementById('adminFlightsTableBody');
+const adminUsersList = document.getElementById('adminUsersList');
+const loginMessage = document.getElementById('loginMessage');
+const flightMessage = document.getElementById('flightMessage');
+const adminMessage = document.getElementById('adminMessage');
+const userNameDisplay = document.getElementById('userNameDisplay');
+const logoutBtn = document.getElementById('logoutBtn');
+const adminViewBtn = document.getElementById('adminViewBtn');
+const returnToFlightsBtn = document.getElementById('returnToFlightsBtn');
+const exportMonthlyBtn = document.getElementById('exportMonthlyBtn');
+const exportDailyBtn = document.getElementById('exportDailyBtn');
+const exportDateInput = document.getElementById('exportDateInput');
 
-        if (isOnLoginPage) {
-            window.location.href = 'flights.html';
-        } else if (currentPath.endsWith('flights.html')) {
-            loadUserFlights(user.id);
-        } else if (currentPath.endsWith('admin.html')) {
-            window.location.href = 'flights.html';
+// DOM elements for admin filters and user management
+const adminMonthFilter = document.getElementById('adminMonthFilter');
+const adminUserFilter = document.getElementById('adminUserFilter');
+const exportAdminStatsBtn = document.getElementById('exportAdminStatsBtn');
+const exportAdminAllFlightsBtn = document.getElementById('exportAdminAllFlightsBtn');
+const adminUserCodeInput = document.getElementById('adminUserCode'); // Changed from adminUserEmail
+const adminUserNameInput = document.getElementById('adminUserName');
+const adminUserPasswordInput = document.getElementById('adminUserPassword');
+const adminAddUserBtn = document.getElementById('adminAddUserBtn');
+const adminUsersMessage = document.getElementById('adminUsersMessage');
+
+
+// --- NEW: Functions for saving/loading flight form drafts ---
+const flightFormInputs = [
+    'fltNo', 'onChocksTime', 'openDoorTime', 'startCleaningTime',
+    'completeCleaningTime', 'readyBoardingTime', 'startBoardingTime',
+    'completeBoardingTime', 'closeDoorTime', 'offChocksTime', 'notes'
+];
+
+function saveFlightFormDraft() {
+    const draft = {};
+    flightFormInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            draft[id] = input.value;
         }
+    });
+    setStoredItem('unsavedFlightData', draft);
+}
+
+function loadFlightFormDraft() {
+    const draft = getStoredItem('unsavedFlightData');
+    if (draft) {
+        flightFormInputs.forEach(id => {
+            const input = document.getElementById(id);
+            if (input && draft[id] !== undefined) {
+                input.value = draft[id];
+            }
+        });
+    }
+}
+
+function clearFlightFormDraft() {
+    removeStoredItem('unsavedFlightData');
+}
+// --- END NEW FUNCTIONS ---
+
+
+// *** NEW: Check authentication on app load ***
+function checkAuth() {
+    if (currentUser && currentUser.token && currentUser.userCode) {
+        // Assume token validity (for a simple client-side app)
+        showAppView();
+        userNameDisplay.textContent = currentUser.name || currentUser.userCode;
     } else {
-        if (!isOnLoginPage) {
-            window.location.href = 'index.html';
-        }
-        if (userNameDisplaySpan) userNameDisplaySpan.textContent = '';
-        if (logoutBtn) logoutBtn.style.display = 'none';
+        showLoginView();
     }
 }
 
-async function handleLogin(e) {
+// Show/Hide Views
+function showLoginView() {
+    loginView.style.display = 'flex';
+    mainAppView.style.display = 'none';
+}
+
+function showAppView() {
+    loginView.style.display = 'none';
+    mainAppView.style.display = 'block';
+    renderFlights(); // Make sure flights are rendered when app view is shown
+    updateAdminUI(); // Update admin UI in case of direct access
+    loadFlightFormDraft(); // *** Load draft data when app view is shown ***
+}
+
+// User Authentication
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const code = codeInput.value.trim();
-    const userName = userNameInput.value.trim();
+    // Get user code from the input field
+    const userCode = document.getElementById('userCode').value;
+    const password = document.getElementById('password').value;
+    loginUser(userCode, password);
+});
 
-    showMessage(loginMessage, '', false);
+async function loginUser(userCode, password) {
+    // In a real app, you'd send these to a backend for authentication
+    // For this simple app, we check against stored users
+    if (users[userCode] && users[userCode].password === password) {
+        // Simulate a token generation
+        const token = btoa(`${userCode}:${password}:${Date.now()}`); // Basic Base64 encoding
 
-    if (userName === '') {
-        showMessage(loginMessage, 'الرجاء إدخال اسمك الكامل.', true);
-        return;
-    }
-
-    if (code === ACCESS_CODE) {
-        const user = { 
-            id: 'single_user_id',
-            name: userName,
-            isLoggedIn: true 
+        currentUser = {
+            userCode: userCode,
+            name: users[userCode].name,
+            role: users[userCode].role,
+            token: token
         };
-        setLoggedInUser(user);
-        window.location.href = 'flights.html';
+
+        setStoredItem('currentUser', currentUser); // Save currentUser to localStorage
+        displayMessage(loginMessage, `مرحباً ${currentUser.name}!`, 'success');
+        setTimeout(() => {
+            loginForm.reset();
+            hideMessage(loginMessage);
+            showAppView();
+            userNameDisplay.textContent = currentUser.name;
+        }, 1000);
     } else {
-        showMessage(loginMessage, 'الكود المدخل غير صحيح.', true);
+        displayMessage(loginMessage, 'كود مستخدم أو كلمة مرور غير صحيحة.', 'error');
     }
 }
 
-async function handleLogout() {
-    clearLoggedInUser();
-    window.location.href = 'index.html';
+logoutBtn.addEventListener('click', () => {
+    logoutUser();
+});
+
+function logoutUser() {
+    currentUser = null;
+    removeStoredItem('currentUser'); // Remove currentUser from localStorage
+    flights = []; // Clear flights to prevent showing previous user's data
+    setStoredItem('flights', flights); // Save empty flights array
+    clearFlightFormDraft(); // *** Clear any unsaved flight form data on logout ***
+    displayMessage(loginMessage, 'تم تسجيل الخروج بنجاح.', 'success');
+    setTimeout(() => {
+        hideMessage(loginMessage);
+        showLoginView();
+    }, 500);
 }
 
-// --- Flights Page Logic (User) ---
-function generateFlightForms(numForms) {
-    if (!flightFormsContainer) return;
-    flightFormsContainer.innerHTML = '';
-    const flightFields = [
-        { id: 'date', label: 'التاريخ', type: 'date', required: true },
-        { id: 'fltNo', label: 'FLT.NO', type: 'text', placeholder: 'رقم الرحلة', required: true },
-        { id: 'onChocksTime', label: 'ON chocks Time', type: 'time' },
-        { id: 'openDoorTime', label: 'Open Door Time', type: 'time' },
-        { id: 'startCleaningTime', label: 'Start Cleaning Time', type: 'time' },
-        { id: 'completeCleaningTime', label: 'Complete Cleaning Time', type: 'time' },
-        { id: 'readyBoardingTime', label: 'Ready Boarding Time', type: 'time' },
-        { id: 'startBoardingTime', label: 'Start Boarding Time', type: 'time' },
-        { id: 'completeBoardingTime', label: 'Complete Boarding Time', type: 'time' },
-        { id: 'closeDoorTime', label: 'Close Door Time', type: 'time' },
-        { id: 'offChocksTime', label: 'Off chocks Time', type: 'time' },
-        { id: 'notes', label: 'الملاحظات', type: 'text', placeholder: 'ملاحظات إضافية' }
-    ];
-
-    for (let i = 0; i < numForms; i++) {
-        const card = document.createElement('div');
-        card.className = 'flight-card';
-        card.innerHTML = `<h4>رحلة رقم ${i + 1}</h4>`;
-
-        flightFields.forEach(field => {
-            const inputGroup = document.createElement('div');
-            inputGroup.className = 'input-group';
-            const label = document.createElement('label');
-            label.setAttribute('for', `flight${i + 1}-${field.id}`);
-            label.textContent = field.label + (field.required ? ' *' : '');
-            
-            const input = document.createElement('input');
-            input.setAttribute('type', field.type);
-            input.setAttribute('id', `flight${i + 1}-${field.id}`);
-            input.setAttribute('name', field.id);
-            if (field.required) {
-                input.setAttribute('required', 'true');
-            }
-            if (field.placeholder) {
-                input.setAttribute('placeholder', field.placeholder);
-            }
-            if (field.type === 'date') {
-                const today = new Date();
-                input.value = today.toISOString().split('T')[0];
-            }
-
-            inputGroup.appendChild(label);
-            inputGroup.appendChild(input);
-            card.appendChild(inputGroup);
-        });
-        flightFormsContainer.appendChild(card);
-    }
-}
-
-async function saveAllFlights() {
-    const user = getLoggedInUser();
-    if (!user || !user.isLoggedIn) {
-        showMessage(messageContainer, "خطأ: معلومات المستخدم غير متوفرة. يرجى تسجيل الدخول.", true);
-        return;
-    }
-    const userId = user.id;
-    const userName = user.name;
-
-    const forms = flightFormsContainer.querySelectorAll('.flight-card');
-    const today = new Date();
-    const currentYear = today.getFullYear().toString();
-    const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
-    
-    let allFlights = getStoredFlights();
-    if (!allFlights[userId]) allFlights[userId] = {};
-    if (!allFlights[userId][currentYear]) allFlights[userId][currentYear] = {};
-    if (!allFlights[userId][currentYear][currentMonth]) allFlights[userId][currentYear][currentMonth] = {};
-
-    let flightsSavedCount = 0;
-
-    for (const form of forms) {
-        const inputs = form.querySelectorAll('input');
-        const flightData = {
-            id: generateUniqueId(),
-            userId: userId,
-            userName: userName,
-            timestamp: new Date().toISOString(),
+// Initialize default admin user if not exists
+function initializeDefaultAdmin() {
+    const adminCode = 'admin123'; // يمكنك تغيير هذا الكود الافتراضي للمسؤول
+    if (!users[adminCode]) {
+        users[adminCode] = {
+            name: 'المسؤول',
+            password: 'admin', // In a real app, hash this password!
+            role: 'admin'
         };
-        let isFormEmpty = true;
-        let isDateMissing = true;
-        let isFltNoMissing = true;
+        setStoredItem('users', users); // Save updated users to localStorage
+    }
+}
 
-        inputs.forEach(input => {
-            const fieldId = input.name;
-            const value = input.value.trim();
-            
-            if (fieldId === 'date' && value) {
-                flightData[fieldId] = value;
-                isDateMissing = false;
-            } else if (fieldId === 'fltNo' && value) {
-                flightData[fieldId] = value;
-                isFltNoMissing = false;
-                isFormEmpty = false;
-            } else if (value) {
-                flightData[fieldId] = value;
-                isFormEmpty = false;
-            } else {
-                flightData[fieldId] = '';
-            }
-        });
+// Flight Management
+flightForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    addFlight();
+});
 
-        if (isFormEmpty) {
-            continue;
-        }
-        if (isDateMissing) {
-            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل التاريخ إجباري.`, true);
-            continue;
-        }
-        if (isFltNoMissing) {
-            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل FLT.NO إجباري.`, true);
-            continue;
-        }
-        
-        allFlights[userId][currentYear][currentMonth][flightData.id] = flightData;
-        flightsSavedCount++;
-        inputs.forEach(input => input.value = '');
-        const dateInput = form.querySelector('input[name="date"]');
-        if (dateInput) {
-            const today = new Date();
-            dateInput.value = today.toISOString().split('T')[0];
-        }
+// *** Add event listener to save draft data on input changes ***
+flightForm.addEventListener('input', saveFlightFormDraft);
+
+function addFlight() {
+    if (!currentUser) {
+        displayMessage(flightMessage, 'الرجاء تسجيل الدخول لإضافة رحلة.', 'error');
+        return;
     }
 
-    if (flightsSavedCount > 0) {
-        setStoredFlights(allFlights);
-        showMessage(messageContainer, `تم حفظ ${flightsSavedCount} رحلة بنجاح!`, false);
-        loadUserFlights(userId);
+    const fltNo = document.getElementById('fltNo').value;
+    const onChocksTime = document.getElementById('onChocksTime').value;
+    const openDoorTime = document.getElementById('openDoorTime').value;
+    const startCleaningTime = document.getElementById('startCleaningTime').value;
+    const completeCleaningTime = document.getElementById('completeCleaningTime').value;
+    const readyBoardingTime = document.getElementById('readyBoardingTime').value;
+    const startBoardingTime = document.getElementById('startBoardingTime').value;
+    const completeBoardingTime = document.getElementById('completeBoardingTime').value;
+    const closeDoorTime = document.getElementById('closeDoorTime').value;
+    const offChocksTime = document.getElementById('offChocksTime').value;
+    const notes = document.getElementById('notes').value;
+
+    const newFlight = {
+        id: Date.now(),
+        userId: currentUser.userCode,
+        userName: currentUser.name,
+        date: new Date().toISOString().slice(0, 10), // Current date in YYYY-MM-DD
+        fltNo,
+        onChocksTime,
+        openDoorTime,
+        startCleaningTime,
+        completeCleaningTime,
+        readyBoardingTime,
+        startBoardingTime,
+        completeBoardingTime,
+        closeDoorTime,
+        offChocksTime,
+        notes
+    };
+
+    flights.unshift(newFlight); // Add to the beginning
+    setStoredItem('flights', flights); // Save flights to localStorage
+    flightForm.reset();
+    clearFlightFormDraft(); // *** Clear draft after successful add ***
+    renderFlights();
+    displayMessage(flightMessage, 'تمت إضافة الرحلة بنجاح!', 'success');
+    setTimeout(() => hideMessage(flightMessage), 3000);
+}
+
+function renderFlights() {
+    flightsTableBody.innerHTML = '';
+    const userFlights = flights.filter(flight => flight.userId === currentUser.userCode);
+
+    if (userFlights.length === 0) {
+        flightsTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center;">لا توجد رحلات مسجلة.</td></tr>`;
+        return;
+    }
+
+    userFlights.forEach(flight => {
+        const row = flightsTableBody.insertRow();
+        row.dataset.id = flight.id;
+        row.insertCell().textContent = flight.date;
+        row.insertCell().textContent = flight.fltNo;
+        row.insertCell().textContent = flight.onChocksTime || 'N/A';
+        row.insertCell().textContent = flight.openDoorTime || 'N/A';
+        row.insertCell().textContent = flight.startCleaningTime || 'N/A';
+        row.insertCell().textContent = flight.completeCleaningTime || 'N/A';
+        row.insertCell().textContent = flight.readyBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.startBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.completeBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.closeDoorTime || 'N/A';
+        row.insertCell().textContent = flight.offChocksTime || 'N/A';
+        row.insertCell().textContent = flight.notes || 'N/A';
+
+        const actionsCell = row.insertCell();
+        actionsCell.classList.add('action-buttons');
+        const editButton = document.createElement('button');
+        editButton.textContent = 'تعديل';
+        editButton.addEventListener('click', () => editFlight(flight.id));
+        actionsCell.appendChild(editButton);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'حذف';
+        deleteButton.classList.add('delete-btn');
+        deleteButton.addEventListener('click', () => deleteFlight(flight.id));
+        actionsCell.appendChild(deleteButton);
+    });
+}
+
+function editFlight(id) {
+    const flightToEdit = flights.find(flight => flight.id === id);
+    if (!flightToEdit) return;
+
+    // Populate the form fields with flight data
+    document.getElementById('fltNo').value = flightToEdit.fltNo;
+    document.getElementById('onChocksTime').value = flightToEdit.onChocksTime;
+    document.getElementById('openDoorTime').value = flightToEdit.openDoorTime;
+    document.getElementById('startCleaningTime').value = flightToEdit.startCleaningTime;
+    document.getElementById('completeCleaningTime').value = flightToEdit.completeCleaningTime;
+    document.getElementById('readyBoardingTime').value = flightToEdit.readyBoardingTime;
+    document.getElementById('startBoardingTime').value = flightToEdit.startBoardingTime;
+    document.getElementById('completeBoardingTime').value = flightToEdit.completeBoardingTime;
+    document.getElementById('closeDoorTime').value = flightToEdit.closeDoorTime;
+    document.getElementById('offChocksTime').value = flightToEdit.offChocksTime;
+    document.getElementById('notes').value = flightToEdit.notes;
+
+    saveFlightFormDraft(); // Save the populated data as a draft in case user navigates away while editing
+
+    // Change submit button to update and add a cancel button
+    const submitButton = flightForm.querySelector('button[type="submit"]');
+    submitButton.textContent = 'تحديث الرحلة';
+    submitButton.onclick = (e) => {
+        e.preventDefault();
+        updateFlight(id);
+    };
+
+    let cancelButton = flightForm.querySelector('#cancelEditBtn');
+    if (!cancelButton) {
+        cancelButton = document.createElement('button');
+        cancelButton.id = 'cancelEditBtn';
+        cancelButton.textContent = 'إلغاء';
+        cancelButton.type = 'button';
+        cancelButton.classList.add('primary-button');
+        cancelButton.style.backgroundColor = '#6c757d'; // Grey color
+        cancelButton.style.marginLeft = '10px';
+        cancelButton.onclick = cancelEdit;
+        submitButton.parentNode.insertBefore(cancelButton, submitButton.nextSibling);
+    }
+}
+
+function updateFlight(id) {
+    const flightIndex = flights.findIndex(flight => flight.id === id);
+    if (flightIndex === -1) return;
+
+    flights[flightIndex] = {
+        ...flights[flightIndex], // Keep existing data like userId, userName, date
+        fltNo: document.getElementById('fltNo').value,
+        onChocksTime: document.getElementById('onChocksTime').value,
+        openDoorTime: document.getElementById('openDoorTime').value,
+        startCleaningTime: document.getElementById('startCleaningTime').value,
+        completeCleaningTime: document.getElementById('completeCleaningTime').value,
+        readyBoardingTime: document.getElementById('readyBoardingTime').value,
+        startBoardingTime: document.getElementById('startBoardingTime').value,
+        completeBoardingTime: document.getElementById('completeBoardingTime').value,
+        closeDoorTime: document.getElementById('closeDoorTime').value,
+        offChocksTime: document.getElementById('offChocksTime').value,
+        notes: document.getElementById('notes').value
+    };
+
+    setStoredItem('flights', flights); // Save updated flights to localStorage
+    flightForm.reset();
+    clearFlightFormDraft(); // *** Clear draft after successful update ***
+    renderFlights();
+    displayMessage(flightMessage, 'تم تحديث الرحلة بنجاح!', 'success');
+    setTimeout(() => hideMessage(flightMessage), 3000);
+
+    // Restore submit button to original state
+    const submitButton = flightForm.querySelector('button[type="submit"]');
+    submitButton.textContent = 'حفظ جميع الرحلات';
+    submitButton.onclick = (e) => {
+        e.preventDefault();
+        addFlight();
+    };
+    const cancelButton = flightForm.querySelector('#cancelEditBtn');
+    if (cancelButton) {
+        cancelButton.remove();
+    }
+}
+
+function cancelEdit() {
+    flightForm.reset();
+    clearFlightFormDraft(); // *** Clear draft on cancel ***
+    const submitButton = flightForm.querySelector('button[type="submit"]');
+    submitButton.textContent = 'حفظ جميع الرحلات';
+    submitButton.onclick = (e) => {
+        e.preventDefault();
+        addFlight();
+    };
+    const cancelButton = flightForm.querySelector('#cancelEditBtn');
+    if (cancelButton) {
+        cancelButton.remove();
+    }
+}
+
+
+function deleteFlight(id) {
+    if (confirm('هل أنت متأكد أنك تريد حذف هذه الرحلة؟')) {
+        flights = flights.filter(flight => flight.id !== id);
+        setStoredItem('flights', flights); // Save updated flights to localStorage
+        renderFlights();
+        displayMessage(flightMessage, 'تم حذف الرحلة بنجاح.', 'success');
+        setTimeout(() => hideMessage(flightMessage), 3000);
+    }
+}
+
+// Admin Panel
+adminViewBtn.addEventListener('click', () => {
+    if (currentUser && currentUser.role === 'admin') {
+        document.getElementById('flightsView').style.display = 'none';
+        document.getElementById('adminView').style.display = 'block';
+        updateAdminUI();
     } else {
-        showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة.', true);
+        displayMessage(flightMessage, 'ليس لديك صلاحيات الوصول إلى لوحة التحكم.', 'error');
+    }
+});
+
+returnToFlightsBtn.addEventListener('click', () => {
+    document.getElementById('adminView').style.display = 'none';
+    document.getElementById('flightsView').style.display = 'block';
+    renderFlights(); // Re-render flights for the current user
+});
+
+adminAddUserBtn.addEventListener('click', () => {
+    const userCode = adminUserCodeInput.value.trim();
+    const name = adminUserNameInput.value.trim();
+    const password = adminUserPasswordInput.value.trim();
+
+    if (!userCode || !name || !password) {
+        displayMessage(adminUsersMessage, 'الرجاء ملء جميع الحقول.', 'error');
+        return;
+    }
+
+    if (users[userCode]) {
+        displayMessage(adminUsersMessage, 'هذا الكود مسجل بالفعل.', 'error');
+        return;
+    }
+
+    users[userCode] = { name, password, role: 'user' }; // New users are 'user' role by default
+    setStoredItem('users', users); // Save updated users to localStorage
+    displayMessage(adminUsersMessage, `تم إضافة المستخدم ${name} بنجاح!`, 'success');
+    adminUserCodeInput.value = '';
+    adminUserNameInput.value = '';
+    adminUserPasswordInput.value = '';
+    updateAdminUI(); // Refresh user list
+    setTimeout(() => hideMessage(adminUsersMessage), 3000);
+});
+
+function deleteUser(userCodeToDelete) {
+    const adminCode = 'admin123';
+    if (userCodeToDelete === adminCode) {
+        displayMessage(adminUsersMessage, 'لا يمكنك حذف المستخدم المسؤول الافتراضي.', 'error');
+        return;
+    }
+    if (userCodeToDelete === currentUser.userCode) {
+        displayMessage(adminUsersMessage, 'لا يمكنك حذف حسابك الحالي.', 'error');
+        return;
+    }
+    if (confirm(`هل أنت متأكد أنك تريد حذف المستخدم ${users[userCodeToDelete].name} (${userCodeToDelete})؟`)) {
+        delete users[userCodeToDelete];
+        // Also remove flights associated with this user
+        flights = flights.filter(flight => flight.userId !== userCodeToDelete);
+        setStoredItem('users', users); // Save updated users to localStorage
+        setStoredItem('flights', flights); // Save updated flights to localStorage
+        displayMessage(adminUsersMessage, 'تم حذف المستخدم بنجاح.', 'success');
+        updateAdminUI();
+        setTimeout(() => hideMessage(adminUsersMessage), 3000);
     }
 }
 
-function loadUserFlights(userId) {
-    if (!userPastFlightsTableBody) return;
-    userPastFlightsTableBody.innerHTML = '';
-
-    const allFlights = getStoredFlights();
-    const today = new Date();
-    const currentYear = today.getFullYear().toString();
-    const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
-
-    const userFlightsForMonth = allFlights[userId]?.[currentYear]?.[currentMonth] || {};
-    
-    // فرز الرحلات حسب التاريخ ثم رقم الرحلة
-    const flightsArray = Object.values(userFlightsForMonth).sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) {
-            return dateB.getTime() - dateA.getTime(); // الأحدث أولاً
-        }
-        return (a.fltNo || '').localeCompare(b.fltNo || ''); // ثم حسب رقم الرحلة أبجدياً
-    });
-
-    if (flightsArray.length === 0) {
-        const row = userPastFlightsTableBody.insertRow();
-        const cell = row.insertCell(0);
-        cell.colSpan = 12;
-        cell.textContent = 'لا توجد رحلات سابقة لهذا الشهر.';
-        cell.style.textAlign = 'center';
-        cell.style.color = '#777';
-        return;
-    }
-
-    flightsArray.forEach(flight => {
-        const row = userPastFlightsTableBody.insertRow();
-        row.dataset.flightId = flight.id;
-        
-        row.insertCell(0).textContent = flight.date || '';
-        row.insertCell(1).textContent = flight.fltNo || '';
-        row.insertCell(2).textContent = flight.onChocksTime || '';
-        row.insertCell(3).textContent = flight.openDoorTime || '';
-        row.insertCell(4).textContent = flight.startCleaningTime || '';
-        row.insertCell(5).textContent = flight.completeCleaningTime || '';
-        row.insertCell(6).textContent = flight.readyBoardingTime || '';
-        row.insertCell(7).textContent = flight.startBoardingTime || '';
-        row.insertCell(8).textContent = flight.completeBoardingTime || '';
-        row.insertCell(9).textContent = flight.closeDoorTime || '';
-        row.insertCell(10).textContent = flight.offChocksTime || '';
-        row.insertCell(11).textContent = flight.notes || '';
-    });
+function updateAdminUI() {
+    renderAdminUsers();
+    populateAdminFilters();
+    renderAdminFlightsTable(); // Show all flights in admin table by default
 }
 
-async function handleExportMonthlyFlights() {
-    const user = getLoggedInUser();
-    if (!user || !user.isLoggedIn) {
-        showMessage(messageContainer, "خطأ: معلومات المستخدم غير متوفرة. يرجى تسجيل الدخول.", true);
-        return;
-    }
-    const userId = user.id;
-
-    const allFlights = getStoredFlights();
-    const today = new Date();
-    const currentYear = today.getFullYear().toString();
-    const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
-    const userName = user.name;
-
-    const userFlightsForMonth = allFlights[userId]?.[currentYear]?.[currentMonth] || {};
-    
-    const flightsArray = Object.values(userFlightsForMonth).sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) {
-            return dateB.getTime() - dateA.getTime();
-        }
-        return (a.fltNo || '').localeCompare(b.fltNo || '');
-    });
-
-    if (flightsArray.length === 0) {
-        showMessage(messageContainer, 'لا توجد رحلات لتصديرها لهذا الشهر.', true);
-        return;
-    }
-
-    try {
-        await exportMonthlyFlightsToDocx(flightsArray, userName, currentMonthNameSpan.textContent, currentYear);
-        showMessage(messageContainer, 'تم تصدير جميع رحلات هذا الشهر إلى ملف Word (DOCX) بنجاح!', false);
-    } catch (error) {
-        console.error("Error exporting monthly flights to DOCX:", error);
-        showMessage(messageContainer, 'حدث خطأ أثناء تصدير الرحلات إلى Word.', true);
+function renderAdminUsers() {
+    adminUsersList.innerHTML = '';
+    for (const userCode in users) {
+        const user = users[userCode];
+        const listItem = document.createElement('li');
+        listItem.innerHTML = `
+            <span>${user.name} (${userCode}) - ${user.role === 'admin' ? 'مسؤول' : 'مستخدم عادي'}</span>
+            <button class="delete-btn" onclick="deleteUser('${userCode}')">حذف</button>
+        `;
+        adminUsersList.appendChild(listItem);
     }
 }
 
-// دالة جديدة لمعالجة تصدير الرحلات ليوم محدد
-async function handleExportDailyFlights() {
-    const user = getLoggedInUser();
-    if (!user || !user.isLoggedIn) {
-        showMessage(messageContainer, "خطأ: معلومات المستخدم غير متوفرة. يرجى تسجيل الدخول.", true);
-        return;
-    }
-
-    const exportDate = exportDateInput.value;
-    if (!exportDate) {
-        showMessage(messageContainer, "الرجاء اختيار تاريخ لتصدير الرحلات.", true);
-        return;
-    }
-
-    const userId = user.id;
-    const userName = user.name;
-    const [year, month, day] = exportDate.split('-'); // 2025-07-08
-
-    const allFlights = getStoredFlights();
-    const userFlightsForDate = allFlights[userId]?.[year]?.[month] || {}; // جلب رحلات الشهر
-
-    const flightsForSelectedDate = Object.values(userFlightsForDate).filter(
-        flight => flight.date === exportDate
-    ).sort((a, b) => {
-        // فرز الرحلات لليوم المحدد حسب الوقت أو رقم الرحلة
-        return (a.fltNo || '').localeCompare(b.fltNo || ''); 
+function populateAdminFilters() {
+    // Populate month filter
+    adminMonthFilter.innerHTML = '<option value="all">كل الأشهر</option>';
+    const uniqueMonths = new Set();
+    flights.forEach(flight => {
+        uniqueMonths.add(flight.date.substring(0, 7)); // YYYY-MM
+    });
+    Array.from(uniqueMonths).sort().reverse().forEach(month => {
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = month;
+        adminMonthFilter.appendChild(option);
     });
 
-    if (flightsForSelectedDate.length === 0) {
-        showMessage(messageContainer, `لا توجد رحلات مسجلة بتاريخ ${exportDate} لتصديرها.`, true);
+    // Populate user filter
+    adminUserFilter.innerHTML = '<option value="all">كل المستخدمين</option>';
+    for (const userCode in users) {
+        const option = document.createElement('option');
+        option.value = userCode;
+        option.textContent = users[userCode].name;
+        adminUserFilter.appendChild(option);
+    }
+}
+
+adminMonthFilter.addEventListener('change', renderAdminFlightsTable);
+adminUserFilter.addEventListener('change', renderAdminFlightsTable);
+
+function renderAdminFlightsTable() {
+    adminFlightsTableBody.innerHTML = '';
+    const selectedMonth = adminMonthFilter.value;
+    const selectedUserCode = adminUserFilter.value;
+
+    let filteredFlights = flights;
+
+    if (selectedMonth !== 'all') {
+        filteredFlights = filteredFlights.filter(flight => flight.date.startsWith(selectedMonth));
+    }
+    if (selectedUserCode !== 'all') {
+        filteredFlights = filteredFlights.filter(flight => flight.userId === selectedUserCode);
+    }
+
+    if (filteredFlights.length === 0) {
+        adminFlightsTableBody.innerHTML = `<tr><td colspan="13" style="text-align: center;">لا توجد رحلات مطابقة للفلاتر.</td></tr>`;
         return;
     }
 
-    try {
-        await exportDailyFlightsToDocx(flightsForSelectedDate, userName, exportDate);
-        showMessage(messageContainer, `تم تصدير ${flightsForSelectedDate.length} رحلة بتاريخ ${exportDate} بنجاح!`, false);
-    } catch (error) {
-        console.error("Error exporting daily flights to DOCX:", error);
-        showMessage(messageContainer, 'حدث خطأ أثناء تصدير رحلات اليوم المحدد إلى Word.', true);
-    }
+    // Sort by date descending then by FLT.NO (basic alpha sort)
+    filteredFlights.sort((a, b) => {
+        if (a.date < b.date) return 1;
+        if (a.date > b.date) return -1;
+        if (a.fltNo < b.fltNo) return -1;
+        if (a.fltNo > b.fltNo) return 1;
+        return 0;
+    });
+
+    filteredFlights.forEach(flight => {
+        const row = adminFlightsTableBody.insertRow();
+        row.insertCell().textContent = flight.date;
+        row.insertCell().textContent = flight.userName || flight.userId;
+        row.insertCell().textContent = flight.fltNo;
+        row.insertCell().textContent = flight.onChocksTime || 'N/A';
+        row.insertCell().textContent = flight.openDoorTime || 'N/A';
+        row.insertCell().textContent = flight.startCleaningTime || 'N/A';
+        row.insertCell().textContent = flight.completeCleaningTime || 'N/A';
+        row.insertCell().textContent = flight.readyBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.startBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.completeBoardingTime || 'N/A';
+        row.insertCell().textContent = flight.closeDoorTime || 'N/A';
+        row.insertCell().textContent = flight.offChocksTime || 'N/A';
+        row.insertCell().textContent = flight.notes || 'N/A';
+    });
 }
+
+// DOCX Export Functionality
+exportMonthlyBtn.addEventListener('click', async () => {
+    if (!currentUser) {
+        displayMessage(flightMessage, 'الرجاء تسجيل الدخول لتصدير الرحلات.', 'error');
+        return;
+    }
+
+    const currentYearMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const flightsForMonth = flights.filter(flight =>
+        flight.userId === currentUser.userCode && flight.date.startsWith(currentYearMonth)
+    );
+
+    const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const [year, monthNum] = currentYearMonth.split('-');
+    const monthName = monthNames[parseInt(monthNum) - 1];
+
+    await exportMonthlyFlightsToDocx(flightsForMonth, currentUser.name, monthName, year);
+    displayMessage(flightMessage, 'تم تصدير الرحلات الشهرية بنجاح!', 'success');
+    setTimeout(() => hideMessage(flightMessage), 3000);
+});
+
+exportDailyBtn.addEventListener('click', async () => {
+    if (!currentUser) {
+        displayMessage(flightMessage, 'الرجاء تسجيل الدخول لتصدير الرحلات.', 'error');
+        return;
+    }
+
+    const selectedDate = exportDateInput.value;
+    if (!selectedDate) {
+        displayMessage(flightMessage, 'الرجاء اختيار تاريخ لتصدير الرحلات اليومية.', 'error');
+        return;
+    }
+
+    const flightsForDate = flights.filter(flight =>
+        flight.userId === currentUser.userCode && flight.date === selectedDate
+    );
+
+    await exportDailyFlightsToDocx(flightsForDate, currentUser.name, selectedDate);
+    displayMessage(flightMessage, `تم تصدير رحلات تاريخ ${selectedDate} بنجاح!`, 'success');
+    setTimeout(() => hideMessage(flightMessage), 3000);
+});
+
+
+exportAdminStatsBtn.addEventListener('click', async () => {
+    if (currentUser?.role !== 'admin') {
+        displayMessage(adminMessage, 'ليس لديك صلاحيات لتصدير الإحصائيات.', 'error');
+        return;
+    }
+
+    const selectedMonth = adminMonthFilter.value; // YYYY-MM
+    if (selectedMonth === 'all') {
+        displayMessage(adminMessage, 'الرجاء اختيار شهر محدد لتصدير الإحصائيات الشهرية.', 'error');
+        return;
+    }
+
+    const flightsForMonth = flights.filter(flight =>
+        flight.date.startsWith(selectedMonth)
+    );
+
+    const userFlightCounts = {};
+    flightsForMonth.forEach(flight => {
+        userFlightCounts[flight.userId] = (userFlightCounts[flight.userId] || 0) + 1;
+    });
+
+    const allUsersMap = new Map();
+    for(const userCode in users) {
+        allUsersMap.set(userCode, users[userCode].name);
+    }
+
+    await exportAdminDataToDocx('stats', { userFlightCounts, totalFlights: flightsForMonth.length, allUsersMap }, selectedMonth);
+    displayMessage(adminMessage, `تم تصدير إحصائيات شهر ${selectedMonth} بنجاح!`, 'success');
+    setTimeout(() => hideMessage(adminMessage), 3000);
+});
+
+exportAdminAllFlightsBtn.addEventListener('click', async () => {
+    if (currentUser?.role !== 'admin') {
+        displayMessage(adminMessage, 'ليس لديك صلاحيات لتصدير جميع الرحلات.', 'error');
+        return;
+    }
+
+    const selectedMonth = adminMonthFilter.value;
+    const selectedUserCode = adminUserFilter.value;
+
+    let flightsToExport = flights;
+
+    if (selectedMonth !== 'all') {
+        flightsToExport = flightsToExport.filter(flight => flight.date.startsWith(selectedMonth));
+    }
+    if (selectedUserCode !== 'all') {
+        flightsToExport = flightsToExport.filter(flight => flight.userId === selectedUserCode);
+    }
+
+    // Sort flights for consistent export order (e.g., by date and then FLT.NO)
+    flightsToExport.sort((a, b) => {
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        if (a.fltNo < b.fltNo) return -1;
+        if (a.fltNo > b.fltNo) return 1;
+        return 0;
+    });
+
+    await exportAdminDataToDocx('allFlights', { flightsToExport, usersStored: users }, selectedMonth, selectedUserCode);
+    displayMessage(adminMessage, `تم تصدير الرحلات التفصيلية بنجاح!`, 'success');
+    setTimeout(() => hideMessage(adminMessage), 3000);
+});
+
+
+// Utility functions
+function displayMessage(element, message, type) {
+    element.textContent = message;
+    element.className = `message ${type}-message`;
+    element.style.display = 'block';
+}
+
+function hideMessage(element) {
+    element.style.display = 'none';
+    element.textContent = '';
+    element.className = 'message';
+}
+
+// Initializations
+initializeDefaultAdmin(); // Ensure default admin exists
+// *** IMPORTANT: Call checkAuth on initial load ***
+document.addEventListener('DOMContentLoaded', checkAuth);
+
