@@ -304,8 +304,14 @@ async function saveAllFlights() {
 
     let flightsSavedCount = 0;
     let hasAnyFormError = false; // لتتبع ما إذا كان هناك أي أخطاء في أي نموذج
+    let formsWithErrors = []; // لتخزين أرقام النماذج التي بها أخطاء
 
-    for (const form of forms) {
+    // إخفاء أي رسائل سابقة في بداية عملية الحفظ
+    hideMessage(messageContainer); 
+
+    for (let i = 0; i < forms.length; i++) {
+        const form = forms[i];
+        const formNumber = i + 1; // رقم الرحلة المعروض للمستخدم
         const inputs = form.querySelectorAll('input');
         const flightData = {
             id: generateUniqueId(),
@@ -313,8 +319,7 @@ async function saveAllFlights() {
             userName: userName,
             timestamp: new Date().toISOString(),
         };
-        let isFormCompletelyEmpty = true; // Flag to check if all inputs in this form are empty (including required ones)
-        let hasAnyInput = false; // Flag to check if any input has a value (even non-required)
+        let hasAnyInput = false; // لتتبع ما إذا كان النموذج يحتوي على أي مدخلات (غير فارغ تماماً)
 
         let dateValue = '';
         let fltNoValue = '';
@@ -324,8 +329,7 @@ async function saveAllFlights() {
             const value = input.value.trim();
             
             if (value) {
-                hasAnyInput = true; // يوجد مدخل واحد على الأقل
-                isFormCompletelyEmpty = false; // النموذج ليس فارغاً تماماً
+                hasAnyInput = true; 
             }
 
             if (fieldId === 'date') {
@@ -333,7 +337,7 @@ async function saveAllFlights() {
             } else if (fieldId === 'fltNo') {
                 fltNoValue = value;
             }
-            flightData[fieldId] = value; // دائماً قم بتخزين القيمة في flightData
+            flightData[fieldId] = value; 
         });
 
         // إذا كان النموذج فارغاً تماماً (لا يوجد أي مدخلات على الإطلاق)، تخطاه دون رسالة خطأ
@@ -342,37 +346,43 @@ async function saveAllFlights() {
         }
 
         // إذا وصل الكود إلى هنا، فهذا يعني أن النموذج ليس فارغاً تماماً (يحتوي على مدخل واحد على الأقل)
-        // الآن نتحقق من الحقول الإجبارية
+        // الآن نتحقق من الحقول الإجبارية للحفظ
         if (!dateValue || !fltNoValue) {
-            showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل التاريخ و/أو FLT.NO إجباريان للحفظ.`, true);
-            hasAnyFormError = true; // سجل وجود خطأ
+            showMessage(messageContainer, `الرحلة رقم ${formNumber}: حقل التاريخ و/أو FLT.NO إجباريان للحفظ.`, true);
+            hasAnyFormError = true; 
+            formsWithErrors.push(formNumber); // أضف رقم النموذج الذي به خطأ
             continue; // لا تحفظ هذا النموذج وانتقل للي بعده
         }
         
         // إذا وصل الكود إلى هنا، فهذا يعني أن النموذج ليس فارغاً تماماً وأن الحقول الإجبارية مملوءة
         allFlights[userId][currentYear][currentMonth][flightData.id] = flightData;
         flightsSavedCount++;
-        // *** لا تمسح الحقول هنا بعد الآن، سيتم مسحها بعد الحفظ الكلي الناجح ***
     }
 
-    // إخفاء أي رسائل خطأ سابقة قبل عرض رسالة جديدة
-    hideMessage(messageContainer);
-
-    // إذا كان هناك أي أخطاء في أي نموذج، لا تمسح المسودة ولا تعرض رسالة نجاح عامة
-    if (hasAnyFormError) {
-        // الرسائل الفردية للأخطاء ستكون قد ظهرت بالفعل
-        // يمكن إضافة رسالة عامة هنا إذا أردت، ولكن الرسائل الفردية أكثر فائدة
-        // showMessage(messageContainer, 'تم حفظ بعض الرحلات بنجاح، لكن كانت هناك أخطاء في رحلات أخرى.', true);
-        return; 
-    }
-
+    // بعد الانتهاء من مراجعة جميع النماذج:
+    // 1. دائماً احفظ الرحلات التي تم جمعها بنجاح
     if (flightsSavedCount > 0) {
         setStoredFlights(allFlights);
-        loadUserFlights(userId); // إعادة تحميل وعرض الرحلات المحفوظة
-        clearFlightFormDraft(); // *** مسح المسودة بعد الحفظ الناجح لكل النماذج الصالحة ***
+        loadUserFlights(userId); // إعادة تحميل وعرض الرحلات المحفوظة في الجدول
+    }
+
+    // 2. إدارة الرسائل ومسح المسودة بناءً على النتائج النهائية
+    if (hasAnyFormError) {
+        // إذا كان هناك أي نموذج به خطأ، حتى لو تم حفظ نماذج أخرى بنجاح
+        let combinedMessage = '';
+        if (flightsSavedCount > 0) {
+            combinedMessage += `تم حفظ ${flightsSavedCount} رحلة بنجاح. `;
+        }
+        combinedMessage += `الرجاء مراجعة الرحلات التالية التي لم يتم حفظها: ${formsWithErrors.join(', ')} بسبب حقول إجبارية مفقودة.`;
+        showMessage(messageContainer, combinedMessage, true);
+        // لا يتم مسح المسودة بالكامل هنا، ليتمكن المستخدم من تصحيح الأخطاء.
+        // يمكننا تطوير clearFlightFormDraft لمسح فقط النماذج التي تم حفظها بنجاح في المستقبل.
+    } else if (flightsSavedCount > 0) {
+        // كل شيء تم حفظه بنجاح ودون أخطاء
+        clearFlightFormDraft(); // مسح المسودة بالكامل
         showMessage(messageContainer, `تم حفظ ${flightsSavedCount} رحلة بنجاح!`, false);
     } else {
-        // إذا لم يتم حفظ أي رحلات (لأنها كلها كانت فارغة أو بها أخطاء)
+        // لم يتم حفظ أي شيء، ولم تكن هناك أخطاء (كل النماذج كانت فارغة تماماً)
         showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة (التاريخ و FLT.NO على الأقل).', true);
     }
 }
