@@ -303,7 +303,7 @@ async function saveAllFlights() {
     if (!allFlights[userId][currentYear][currentMonth]) allFlights[userId][currentYear][currentMonth] = {};
 
     let flightsSavedCount = 0;
-    let hasError = false;
+    let hasError = false; // لتتبع ما إذا كان هناك أي أخطاء في أي نموذج
 
     for (const form of forms) {
         const inputs = form.querySelectorAll('input');
@@ -337,39 +337,41 @@ async function saveAllFlights() {
             }
         });
 
-        // If the form is completely empty (all fields are empty), skip saving it
+        // إذا كان النموذج فارغاً تماماً، تخطاه ولا تحاول حفظه أو إظهار خطأ
         if (isFormCompletelyEmpty) {
             continue;
         }
 
-        // Check required fields only if form is not completely empty
+        // تحقق من الحقول الإجبارية فقط إذا لم يكن النموذج فارغاً تماماً
         if (isDateMissing) {
             showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل التاريخ إجباري.`, true);
-            hasError = true;
+            hasError = true; // سجل وجود خطأ
             continue; // لا تحفظ هذا النموذج وانتقل للي بعده
         }
         if (isFltNoMissing) {
             showMessage(messageContainer, `الرحلة رقم ${Array.from(forms).indexOf(form) + 1}: حقل FLT.NO إجباري.`, true);
-            hasError = true;
+            hasError = true; // سجل وجود خطأ
             continue; // لا تحفظ هذا النموذج وانتقل للي بعده
         }
         
+        // إذا وصل الكود إلى هنا، فهذا يعني أن النموذج ليس فارغاً تماماً وأن الحقول الإجبارية مملوءة
         allFlights[userId][currentYear][currentMonth][flightData.id] = flightData;
         flightsSavedCount++;
-        // *** لا تمسح الحقول هنا بعد الآن ***
+        // *** لا تمسح الحقول هنا بعد الآن، سيتم مسحها بعد الحفظ الكلي الناجح ***
     }
 
+    // إذا كان هناك أي أخطاء في أي نموذج، لا تمسح المسودة ولا تعرض رسالة نجاح عامة
     if (hasError) {
-        // إذا كان هناك أي أخطاء، لا تمسح المسودة ولا تعرض رسالة نجاح عامة
         return; 
     }
 
     if (flightsSavedCount > 0) {
         setStoredFlights(allFlights);
         loadUserFlights(userId); // إعادة تحميل وعرض الرحلات المحفوظة
-        clearFlightFormDraft(); // *** مسح المسودة بعد الحفظ الناجح لكل النماذج ***
+        clearFlightFormDraft(); // *** مسح المسودة بعد الحفظ الناجح لكل النماذج الصالحة ***
         showMessage(messageContainer, `تم حفظ ${flightsSavedCount} رحلة بنجاح!`, false);
     } else {
+        // إذا لم يتم حفظ أي رحلات (لأنها كلها كانت فارغة أو بها أخطاء)
         showMessage(messageContainer, 'لم يتم حفظ أي رحلات. يرجى ملء الحقول المطلوبة.', true);
     }
 }
