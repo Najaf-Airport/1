@@ -532,3 +532,53 @@ footer {
         max-width: none;
     }
 }
+/* --- كود خاص بضبط قياسات الطباعة والتصدير لـ A4 --- */
+@media print {
+    /* 1. ضبط قياسات الورقة وإلغاء الخلفيات الرمادية */
+    body {
+        background-color: #fff !important;
+        width: 210mm; /* عرض الـ A4 القياسي */
+        margin: 0;
+        padding: 0;
+        font-size: 10pt; /* تصغير الخط قليلاً ليناسب الورقة */
+    }
+
+    /* 2. إلغاء العناصر التي لا نحتاجها في الورقة (مثل الأزرار والهيدر) */
+    header, #logoutBtn, .export-button, .primary-button, footer, .export-options {
+        display: none !important;
+    }
+
+    /* 3. جعل المحتوى الرئيسي يأخذ العرض الكامل للورقة */
+    main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm !important; /* هامش داخلي للورقة */
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* 4. ضبط الجداول لتتناسب مع عرض الورقة ومنع قصها */
+    .table-responsive {
+        overflow: visible !important; /* إظهار الجدول كاملاً */
+        border: none !important;
+    }
+
+    table {
+        width: 100% !important;
+        table-layout: fixed; /* إجبار الجدول على الالتزام بعرض الورقة */
+        word-wrap: break-word;
+    }
+
+    table th, table td {
+        white-space: normal !important; /* السماح للنص بالنزول لسطر جديد بدل التمدد عرضياً */
+        font-size: 9pt !important; /* تصغير خط الجدول لضمان استيعاب البيانات */
+        padding: 5px !important;
+        border: 1px solid #333 !important; /* جعل الحدود واضحة للطباعة */
+    }
+
+    /* 5. منع قطع الصفوف بين ورقتين */
+    tr {
+        page-break-inside: avoid;
+    }
+}
