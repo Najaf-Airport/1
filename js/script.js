@@ -235,7 +235,7 @@ function generateFlightForms(numForms) {
     flightFormsContainer.innerHTML = '';
     const flightFields = [
         { id: 'date', label: 'التاريخ', type: 'date', required: true },
-        { id: 'fltNo', label: 'FLT.NO', type: 'text', placeholder: 'رقم الرحلة', required: true },
+        { id: 'fltNo', label: 'FLT.NO', type: 'text', placeholder: 'اسم ورقم الرحلة', required: true },
         { id: 'onChocksTime', label: 'ON chocks Time', type: 'time' },
         { id: 'openDoorTime', label: 'Open Door Time', type: 'time' },
         { id: 'startCleaningTime', label: 'Start Cleaning Time', type: 'time' },
