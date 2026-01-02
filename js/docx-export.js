@@ -74,7 +74,7 @@ function createStandardHeaderFooter() {
                     new Paragraph({
                         children: [
                             new TextRun({
-                                text: "تولدت بواسطة نظام إدارة الطائرات في مطار النجف الأشرف الدولي.",
+                                text: "  تولدت بنظام الالكتروني تنسيق الطائرات -مطار النجف الاشرف الدولي - MUSTAFA.",
                                 size: 20, // ~10pt
                                 color: "777777",
                             }),
