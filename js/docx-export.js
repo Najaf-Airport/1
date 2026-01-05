@@ -179,7 +179,7 @@ export async function exportMonthlyFlightsToDocx(flightsArray, userName, monthNa
             new Paragraph({
                 children: [
                     new TextRun({
-                        text: `المستخدم: ${userName || 'غير معروف'}`,
+                        text: `اسم المنسق: ${userName || 'غير معروف'}`,
                         bold: true,
                         size: 24, // ~12pt
                     }),
@@ -333,7 +333,7 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
             new Paragraph({
                 children: [
                     new TextRun({
-                        text: `المستخدم: ${userName || 'غير معروف'}`,
+                        text: `اسم المنسق: ${userName || 'غير معروف'}`,
                         bold: true,
                         size: 24, // ~12pt
                     }),
@@ -426,7 +426,7 @@ export async function exportDailyFlightsToDocx(flightsArray, userName, date) {
 // exportAdminDataToDocx (بدون تغيير)
 export async function exportAdminDataToDocx(type, data, filterMonth, filterUserEmail) {
     const [year, month] = filterMonth.split('-');
-    const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const monthNames = ["يناير1", "فبراير2", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "أيلول", "أكتوبر", "نوفمبر", "ديسمبر"];
     const monthName = monthNames[parseInt(month) - 1];
 
     let sections = [];
